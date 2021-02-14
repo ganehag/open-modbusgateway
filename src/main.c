@@ -107,9 +107,11 @@ mqtt_stderr_log(int rc) {
 		case MOSQ_ERR_PAYLOAD_SIZE:
 			fprintf(stderr, "payload is too large\n");
 		break;
+/*
 		case MOSQ_ERR_MALFORMED_UTF8:
 			fprintf(stderr, "malformed reply topic\n");
 		break;
+*/
 		default:
 			fprintf(stderr, "unknown error while publishing to broker\n");
 		break;
