@@ -362,6 +362,23 @@ message_callback(struct mosquitto *mosq, void *obj, const struct mosquitto_messa
 		&raw_registers          // %s
 	);
 
+
+#ifdef DEBUG
+	fprintf(stderr, "%hhu %llu %hhu %s %s %hu %hhu %hhu %u %hu %s\n",
+		req->format,           // %d
+		req->cookie,           // %llu
+		req->ip_type,          // %d (Will be managed by modbus_new_tcp_pi)
+		req->ip,               // %s
+		req->port,             // %s (Yes, as string)
+		req->timeout,          // %d
+		req->slave_id,         // %d
+		req->function,         // %d
+		req->register_addr,    // %d (is register number in request format)
+		req->register_count,   // %d (is the value if function is 6)
+		raw_registers          // %s
+	);
+#endif
+
 	free(buffer);
 
 	switch(rc) {
