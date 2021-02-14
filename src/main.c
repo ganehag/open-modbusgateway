@@ -313,7 +313,7 @@ message_callback(struct mosquitto *mosq, void *obj, const struct mosquitto_messa
 	/*
 	* Origin: https://wiki.teltonika-networks.com/view/RUT955_Modbus#MQTT_Gateway
 	*
-	* 0 <COOKIE> <IP_TYPE> <IP> <PORT> <TIMEOUT> <SLAVE_ID> <MODBUS_FUNCTION> <register_addr> <REGISTER_COUNT/VALUE>
+	* 0 <COOKIE> <IP_TYPE> <IP> <PORT> <TIMEOUT> <SLAVE_ID> <MODBUS_FUNCTION> <REGISTER_NUMBER> <REGISTER_COUNT/VALUE>
 	*
 	* 0 - must be 0, which signifies a textual format (currently the only one implemented).
 	* Cookie - a 64-bit unsigned integer in range [0..264]). A cookie is used in order to distinguish which response belongs
