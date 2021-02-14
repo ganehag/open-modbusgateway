@@ -34,10 +34,10 @@ typedef struct {
 	uint8_t ip_type;
 	char ip[64];
 	char port[8];
-	int timeout;
+	uint16_t timeout;
 	uint8_t slave_id;
 	uint8_t function;
-	int register_addr;
+	uint32_t register_addr;
 	uint16_t register_count;
 	uint16_t data[123];
 } t_request;
@@ -348,7 +348,7 @@ message_callback(struct mosquitto *mosq, void *obj, const struct mosquitto_messa
 	unsigned char raw_registers[1024];  // FIXME: can we do this in a better way?
 	memset(raw_registers, 0, sizeof(raw_registers));
 
-	int rc = sscanf(buffer, "%d %llu %d %s %s %d %d %d %d %d %s",
+	int rc = sscanf(buffer, "%hhu %llu %hhu %s %s %hu %hhu %hhu %u %hu %s",
 		&req->format,           // %d
 		&req->cookie,           // %llu
 		&req->ip_type,          // %d (Will be managed by modbus_new_tcp_pi)
