@@ -30,8 +30,8 @@ define Package/open-modbusgateway/install
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_DIR) $(1)/usr/sbin
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/src/modbusgateway.conf $(1)/etc/config/modbusgateway
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/src/modbusgateway.init $(1)/etc/init.d/modbusgateway
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/openwrt/modbusgateway.conf $(1)/etc/config/modbusgateway
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/openwrt/modbusgateway.init $(1)/etc/init.d/modbusgateway
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/src/modbusgateway $(1)/usr/sbin/modbusgateway
 endef
 
