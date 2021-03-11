@@ -367,7 +367,7 @@ message_callback(struct mosquitto *mosq, void *obj, const struct mosquitto_messa
 	unsigned char raw_registers[1024];  // FIXME: can we do this in a better way?
 	memset(raw_registers, 0, sizeof(raw_registers));
 
-	int rc = sscanf(buffer, "%hhu %llu %hhu %s %s %hu %hhu %hhu %u %hu %s",
+	int num_args = sscanf(buffer, "%hhu %llu %hhu %s %s %hu %hhu %hhu %u %hu %s",
 		&req->format,           // %d
 		&req->cookie,           // %llu
 		&req->ip_type,          // %d (Will be managed by modbus_new_tcp_pi)
@@ -383,7 +383,9 @@ message_callback(struct mosquitto *mosq, void *obj, const struct mosquitto_messa
 
 
 #ifdef DEBUG
-	fprintf(stderr, "%hhu %llu %hhu %s %s %hu %hhu %hhu %u %hu %s\n",
+	fprintf(stderr, "num parameters %i\n", num_args);
+
+	fprintf(stderr, "1: %hhu 2:%llu 3:%hhu 4:%s 5:%s 6:%hu 7:%hhu 8:%hhu 9:%u 10:%hu 11:%s\n",
 		req->format,           // %d
 		req->cookie,           // %llu
 		req->ip_type,          // %d (Will be managed by modbus_new_tcp_pi)
@@ -400,7 +402,7 @@ message_callback(struct mosquitto *mosq, void *obj, const struct mosquitto_messa
 
 	free(buffer);
 
-	switch(rc) {
+	switch(num_args) {
 		case EILSEQ:
 			fprintf(stderr, "Input contains invalid character\n");
 			goto cleanup;
@@ -413,8 +415,7 @@ message_callback(struct mosquitto *mosq, void *obj, const struct mosquitto_messa
 		case ERANGE:
 			fprintf(stderr, "Interger size exceeds capacity\n");
 			goto cleanup;
-		case 9: // Number of expected items
-		case 10: // or this
+		case 10: // Number of expected items
 		case 11: // or this
 			break;  // break out of the switch
 		default:
@@ -446,14 +447,14 @@ message_callback(struct mosquitto *mosq, void *obj, const struct mosquitto_messa
 		fprintf(stderr, "Invalid function call in request\n");
 		goto cleanup;
 	}
-	if(req->register_count > 123) {
+	if ((req->function == 15 || req->function == 16) && req->register_count > 123) {
 		error = INVALID_REQUEST;
 		fprintf(stderr, "Overflow register count in request\n");
 		goto cleanup;
 	}
 
 	// Parsing of register values
-	if(req->function == 5 || req->function == 6 || req->function == 15 || req->function == 16) {
+	if((req->function == 15 || req->function == 16) && num_args == 11) {
 		int read_count = 0;
 		char* token = strtok(raw_registers, ",");
 
@@ -464,9 +465,17 @@ message_callback(struct mosquitto *mosq, void *obj, const struct mosquitto_messa
 		}
 
 		if(read_count != req->register_count) {
+			fprintf(stderr, "Invalid number of values supplied\n");
 			error = INVALID_REQUEST;
 			goto cleanup;
 		}
+	} else if((req->function == 1 || req->function == 2 || req->function == 3 || req->function == 4 || \
+		      req->function == 5 || req->function == 6) && num_args == 10) {
+		// OK
+	} else {
+		error = INVALID_REQUEST;
+		fprintf(stderr, "Invalid protocol arguments\n");
+		goto cleanup;
 	}
 
 	// Run the handler as a separate thread
