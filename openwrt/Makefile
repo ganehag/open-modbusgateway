@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=open-modbusgateway
-PKG_VERSION:=0.1.2
+PKG_VERSION:=0.1.3
 PKG_RELEASE:=1
 PKG_LICENSE:=GPLv3
 PKG_LICENSE_FILES:=LICENSE
