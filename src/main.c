@@ -297,7 +297,7 @@ handle_request(void *arg) {
 			break;
 		}
 
-#if DEBUG
+#ifdef DEBUG
 		if(req->function >= 1 && req->function <= 4) {
 			for(int i = 0; i < req->register_count; i++) {
 				printf("DEBUG read %02d: %i\n", i, req->data[i]);
