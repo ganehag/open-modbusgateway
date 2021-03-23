@@ -18,7 +18,7 @@ define Package/open-modbusgateway
     SECTION:=net
     CATEGORY:=Network
     TITLE:=Open Modbus Gateway
-    DEPENDS:=+libmosquitto +libmodbus +lpthreads
+    DEPENDS:=+libmosquitto +libmodbus
     MAINTAINER:=Mikael Ganehag Brorsson <mikael.brorsson@gmail.com>
 endef
 
