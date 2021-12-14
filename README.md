@@ -7,9 +7,9 @@ This software is an Open Source alternative to Teltonikas' Modbus Gateway (`modb
 
 # Background
 
-The `modbusgateway` software of the Teltonika RUT is the critical component of a product package at the company that I work for.
+The `modbusgateway` software of the Teltonika RUT is the critical component of a product package at the company I work for.
 
-Due to limitations in the original software, it's impossible to `read` or `write` to coils or read from discrete inputs. I wanted to fix this. But due to budget constraints, I could not push through a request to replace the software.
+Due to limitations in the original software, it's impossible to `read` or `write` to coils or read from discrete inputs. So naturally, I wanted to fix this. But due to budget constraints, I could not push through a request to replace the software.
 
 So, I made an Open Source version in my spare time.
 
@@ -77,7 +77,7 @@ Where <message> is the error description.
 
 # Examples
 
-## Reading 5 coils
+## Reading five coils
 
 **Request**  
 
@@ -87,7 +87,7 @@ Where <message> is the error description.
 
     16468394968118163995 OK 1 1 1 1 1
 
-## Reading 3 input registers
+## Reading three input registers
 
 **Request**  
 
@@ -99,7 +99,7 @@ Where <message> is the error description.
     9958479625634 OK 1234 5678 9101
 
 
-## Sending to few holding register values
+## Sending too few holding register values
 
 **Request**  
 
