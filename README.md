@@ -2,16 +2,20 @@
 
 This software is an Open Source alternative to Teltonikas' Modbus Gateway (`modbusgateway`).
 
+It is written in C and uses the [libmodbus](https://libmodbus.org/) library. It also depends on the [libmosquitto](https://mosquitto.org/) library for MQTT communication.
+
 > **NOTE:** This software is in no way affiliated with Teltonika.
 
 
 # Background
 
-The `modbusgateway` software of the Teltonika RUT is the critical component of a product package at the company I work for.
+The Teltonika RUT's `modbusgateway` software is a crucial component of the product offering at my company.
 
-Due to limitations in the original software, it's impossible to `read` or `write` to coils or read from discrete inputs. So naturally, I wanted to fix this. But due to budget constraints, I could not push through a request to replace the software.
+Despite the original software having limitations, such as not being able to read from discrete inputs or write or read coils, I was determined to find a solution. However, due to our limited resources and time, replacing the software entirely was not an option.
 
-So, I made an Open Source version in my spare time.
+I took matters into my own hands and, in my spare time, created an open-source version that addresses these limitations and is specifically tailored to our needs.
+
+The software is written in C and is based on the [libmodbus](https://libmodbus.org/) library.
 
 
 # Protocol
@@ -110,3 +114,26 @@ Where <message> is the error description.
 
     565842596387 ERROR: INVALID REQUEST
 
+
+# Security
+
+Modbus is a protocol that is not secure by default. There is no authentication or encryption in the Modbus protocol.
+
+This software uses MQTT to relay messages to a Modbus TCP slave from the internet. MQTT is a secure protocol, but it is up to the user to ensure that the MQTT broker is secure. At the moment, this gateway does not support TLS encryption. It only supports plain MQTT with username and password authentication. I will rectify this sometime in the future. In the meantime, using a secure MQTT broker is recommended as a stepping stone to the internet.
+
+Still, one shouldn't just trust any message sent to the gateway. Otherwise, the gateway would blindly relay the message to the Modbus TCP slave. Even a simple misspelling of a register number could cause damage to the Modbus TCP slave.
+
+To get around this, the gateway has built-in checks to filter out messages. A message must pass the following checks to be relayed to the Modbus TCP slave:
+
+- CIDR check: the IP address of the request target must be within the specified CIDR range.
+- Port check: the port number of the request target must be within the specified range.
+- Slave ID check: the slave ID of the request must match the specified slave ID.
+- Function check: the Modbus function of the request must match and be only one of the following: 1, 2, 3, 4, 5, 6, 15 or 16.
+- Register number check: the register number must be within the specified range.
+
+The checks are configurable via the configuration file. The configuration file is described in the next section.
+
+
+# Configuration
+
+FIXME
