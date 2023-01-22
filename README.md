@@ -15,8 +15,6 @@ Despite the original software having limitations, such as not being able to read
 
 I took matters into my own hands and, in my spare time, created an open-source version that addresses these limitations and is specifically tailored to our needs.
 
-The software is written in C and is based on the [libmodbus](https://libmodbus.org/) library.
-
 
 # Protocol
 
