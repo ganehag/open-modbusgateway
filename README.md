@@ -50,9 +50,9 @@ A `controller` publishes a message in the format below on a `request` topic. The
 | Field    | Value                   | Explanation                                                                                                                                                                |
 |----------|-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | COOKIE   | 64-bit unsigned integer | A cookie is used to distinguish which response belongs to which request. Each request and the corresponding response contain a matching cookie: a 64-bit unsigned integer. |
-| Function | 5, 6, 15, 16            | For functions 5, 6, 15 and 16, the response will be "<COOKIE> OK"                                                                                                          |
-| Function | 1, 2, 3, 4              | For functions 1, 2, 3, 4, the response will be "<COOKIE> OK <VALUE> <VALUE> <VALUE> ..." where <VALUE> are the values read.                                                |
-| Error    |                         | For failures, the response will be "<COOKIE> ERROR: <message>" where <message> is the error description.                                                                   |
+| Function | 5, 6, 15, 16            | For functions 5, 6, 15 and 16, the response will be "&lt;COOKIE&gt; OK"                                                                                                    |
+| Function | 1, 2, 3, 4              | For functions 1, 2, 3, 4, the response will be "&lt;COOKIE&gt; OK &lt;VALUE&gt; &lt;VALUE&gt; &lt;VALUE&gt; ..." where &lt;VALUE&gt; are the values                        |
+| Error    |                         | For failures, the response will be "&lt;COOKIE&gt; ERROR: &lt;message&gt;" where &lt;message&gt; is the error description.                                                 |
 
 
 # Examples
