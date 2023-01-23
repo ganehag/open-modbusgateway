@@ -11,39 +11,39 @@ typedef struct {
 } expected_port_reg_t;
 
 const char file_content[] = "config rule\n"
-    "    option ip = '::ffff:192.168.1.1/120'\n"
-    "    option port = '502, 5020-5025'\n"
-    "    option slave_id = '1'\n"
-    "    option function = '3'\n"
-    "    option register_address = '0-100'\n\n"
+    "    option ip '::ffff:192.168.1.1/120'\n"
+    "    option port '502, 5020-5025'\n"
+    "    option slave_id '1'\n"
+    "    option function '3'\n"
+    "    option register_address '0-100'\n\n"
     "config rule\n"
-    "    option ip = '::ffff:192.168.2.1/120'\n"
-    "    option port = '502, 5020-5025'\n"
-    "    option slave_id = '1'\n"
-    "    option function = '3'\n"
-    "    option register_address = '0-100'\n\n"
+    "    option ip '::ffff:192.168.2.1/120'\n"
+    "    option port '502, 5020-5025'\n"
+    "    option slave_id '1'\n"
+    "    option function '3'\n"
+    "    option register_address '0-100'\n\n"
     "config rule\n"
-    "    option ip = '::ffff:172.16.0.1/120'\n"
-    "    option port = '5020'\n"
-    "    option slave_id = '1'\n"
-    "    option function = '3'\n"
-    "    option register_address = '100-200'\n";
+    "    option ip '::ffff:172.16.0.1/120'\n"
+    "    option port '5020'\n"
+    "    option slave_id '1'\n"
+    "    option function '3'\n"
+    "    option register_address '100-200'\n";
 
 // file with single working rule
 const char file_content_single[] = "config rule\n"
-	"    option ip = '::ffff:192.168.100.1/120'\n"
-	"\t\t\r\voption port = '502, 5020-5025'\n"
-	"    option slave_id = '1'\n"
-	"    option function = '4'\n"
-	"    option register_address = '0-100,    50-200'\n";
+	"    option ip '::ffff:192.168.100.1/120'\n"
+	"\t\t\r\voption port '502, 5020-5025'\n"
+	"    option slave_id '1'\n"
+	"    option function '4'\n"
+	"    option register_address '0-100,    50-200'\n";
 
 // config file content with too many port, ranges > 8
 const char file_content_too_many_port_ranges[] = "config rule\n"
-	"    option ip = '::ffff:192.168.1.1/120'\n"
-	"    option port = '502, 5020-5025, 5026-5030, 5031-5035, 5036-5040, 5041-5045, 5046-5050, 5051-5055, 5056-5060'\n"
-	"    option slave_id = '1'\n"
-	"    option function = '3'\n"
-	"    option register_address = '0-100'\n\n";
+	"    option ip '::ffff:192.168.1.1/120'\n"
+	"    option port '502, 5020-5025, 5026-5030, 5031-5035, 5036-5040, 5041-5045, 5046-5050, 5051-5055, 5056-5060'\n"
+	"    option slave_id '1'\n"
+	"    option function '3'\n"
+	"    option register_address '0-100'\n\n";
 
 void
 callback_function_helper(void *data, rule_t *rule) {

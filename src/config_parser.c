@@ -56,7 +56,11 @@ int
 config_parse_file(FILE *file, void (*callback)(void *data, rule_t *rule), void *user_obj) {
     char line[MAX_LINE_LEN];
     rule_t rule;
+
     int in_config = 0;
+    int in_config_rule = 0;
+    int in_config_mqtt = 0;
+
     int line_number = -1;  // -1 because of the first line, which will increment line_number to 0
 
     // read a line from the config file
@@ -69,22 +73,45 @@ config_parse_file(FILE *file, void (*callback)(void *data, rule_t *rule), void *
 
 		// check for start of config rule, a rule is a type and config is the accepted type
 		if (strncmp(line, "config rule", 11) == 0) {
+			in_config_rule = 1;
 			in_config = 1;
 			memset(&rule, 0, sizeof(rule_t)); // clear config struct
 			continue;
 		}
 
 		// check for end of config rule
-        if (in_config && line[0] == '\0') {
+        if (in_config_rule && line[0] == '\0') {
         	// ensure the callback function is not NULL
         	if (callback != NULL) {
         		// call the callback function
         		callback(user_obj, &rule);
 			}
 
+            in_config_rule = 0;
             in_config = 0;
             continue;
         }
+
+		// check for start of config mqtt, a rule is a type and config is the accepted type
+		if (strncmp(line, "config mqtt", 11) == 0) {
+			in_config_mqtt = 1;
+			in_config = 1;
+			// FIXME: clear config struct for mqtt
+			continue;
+		}
+
+		// check for end of config mqtt
+		if (in_config_mqtt && line[0] == '\0') {
+			// ensure the callback function is not NULL
+			if (callback != NULL) {
+				// call the callback function
+				// callback(user_obj, &rule);
+			}
+
+			in_config_mqtt = 0;
+			in_config = 0;
+			continue;
+		}
 
 		// skip empty lines in a safe way
 		if (line[0] == 0) {
@@ -93,56 +120,86 @@ config_parse_file(FILE *file, void (*callback)(void *data, rule_t *rule), void *
 
 		// parse option
 		if (in_config) {
-			char *option_name = strtok(line, "=");
-			char *option_value = strtok(NULL, "=");
+			char *opt_line = trim(line, strlen(line));
+			char *opt = strsep(&opt_line, " ");
+			char *name = strsep(&opt_line, " ");
+			char *value = opt_line;
 
-			if (option_name == NULL || option_value == NULL) {  // check for errors
+			if (opt == NULL || name == NULL || value == NULL) {
 				continue;
 			}
 
-			// trim option name
-			option_name = trim(option_name, strlen(option_name));
+			// trim option
+			opt = trim(opt, strlen(opt));
 
 			// ensure this is a valid option element
-			if (strncmp(option_name, "option", 6) != 0) {
+			if (strncmp(opt, "option", 6) != 0) {
 				continue;  // skip this line
-			} else {
-				option_name += 6;  // move pointer to the start of the option name
 			}
 
-			// trim option name (again)
-			option_name = trim(option_name, strlen(option_name));
-
-			// trim option value
-			option_value = trim(option_value, strlen(option_value));
+			name = trim(name, strlen(name));
+			value = trim(value, strlen(value));
 
 			// option_value should be quoted, remove quotes, " or ' (leading), use trim_token
-			option_value = trim_token(option_value, '\'', strlen(option_value));
-			option_value = trim_token(option_value, '"', strlen(option_value));
+			value = trim_token(value, '\'', strlen(value));
+			value = trim_token(value, '"', strlen(value));
 
-			if (strncmp(option_name, "ip", 2) == 0) {
-				// copy ip to config.ip
-				strncpy(rule.ip, option_value, sizeof(rule.ip));
-			} else if (strcmp(option_name, "port") == 0) {
-				// parse_option_port has the following signature:
-				int parse_error = parse_option_range(option_value, rule.port);
-				if (parse_error != 0) {
-					return CONFIG_PARSER_ERROR_INVALID_PORT;
+			if(in_config_rule) {
+				if (strncmp(name, "ip", 2) == 0) {
+					// copy ip to config.ip
+					strncpy(rule.ip, value, sizeof(rule.ip));
+				} else if (strncmp(name, "port", 4) == 0) {
+					// parse_option_port has the following signature:
+					int parse_error = parse_option_range(value, rule.port);
+					if (parse_error != 0) {
+						return CONFIG_PARSER_ERROR_INVALID_PORT;
+					}
+				} else if (strncmp(name, "slave_id", 8) == 0) {
+					rule.slave_id = atoi(value);
+				} else if (strncmp(name, "function", 8) == 0) {
+					rule.function = atoi(value);
+				} else if (strncmp(name, "register_address", 16) == 0) {
+					int parse_error = parse_option_range(value, rule.register_addr);
+					if (parse_error != 0) {
+						return CONFIG_PARSER_ERROR_INVALID_REGISTER_ADDRESS;
+					}
 				}
-			} else if (strcmp(option_name, "slave_id") == 0) {
-				rule.slave_id = atoi(option_value);
-			} else if (strcmp(option_name, "function") == 0) {
-				rule.function = atoi(option_value);
-			} else if (strcmp(option_name, "register_address") == 0) {
-				int parse_error = parse_option_range(option_value, rule.register_addr);
-				if (parse_error != 0) {
-					return CONFIG_PARSER_ERROR_INVALID_REGISTER_ADDRESS;
+			} else if (in_config_mqtt) {
+				// MQTT config options
+
+				if (strncmp(name, "host", 4) == 0) {
+					// ip or hostname
+				} else if(strncmp(name, "port", 4) == 0) {
+					// port number
+				} else if(strncmp(name, "keepalive", 9) == 0) {
+					// keepalive in seconds
+				} else if(strncmp(name, "username", 8) == 0) {
+					// username for authentication
+				} else if(strncmp(name, "password", 8) == 0) {
+					// password for authentication
+				} else if(strncmp(name, "client_id", 9) == 0) {
+					// use a fixed client id
+				} else if(strncmp(name, "qos", 3) == 0) {
+					// qos level
+				} else if(strncmp(name, "retain", 6) == 0) {
+					// retain flag
+				} else if(strncmp(name, "clean_session", 13) == 0) {
+					// clean session when connecting
+				} else if(strncmp(name, "ca_cert", 7) == 0) {
+					// server certificate
+				} else if(strncmp(name, "cert", 4) == 0) {
+					// client certificate
+				} else if(strncmp(name, "key", 3) == 0) {
+					// client key
+				} else if(strncmp(name, "verify", 6) == 0) {
+					// verify the server certificate
+					// should not be used in production
 				}
 			}
 		}
 	}
 
-	if(in_config) {
+	if(in_config_rule) {
 		// execute callback function, if it is not NULL
 		// otherwise the last config rule may be ignored
 		// it all depends on how many \n are in the file
