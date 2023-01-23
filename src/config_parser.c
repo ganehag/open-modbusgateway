@@ -52,56 +52,6 @@ trim_token(char *str, char trim_char, size_t len) {
     return str+i;
 }
 
-/*
-
-config_t is a struct that holds all the configuration options
-that are read from the config file.
-
-The format of the config file is as follows:, # is a comment line and everything after # is ignored
-
-config rule
-    option ip = '::ffff:192.168.1.1/120'
-    option port = '502, 5020-5025'
-    option slave_id = '1'
-    option function = '3'
-    option register_address = '0-100'
-
-config rule
-    option ip = '::ffff:192.168.2.1/120'
-    option port = '502, 5020-5025'
-    option slave_id = '1'
-    option function = '3'
-    option register_address = '0-100'
-
-config rule
-    option ip = '::ffff:172.16.0.1/120'
-    option port = '5020'
-    option slave_id = '1'
-    option function = '3'
-    option register_address = '100-200'
-
-The parser needs to be a stream parser, so it can be used in an embedded system.
-
-After each config rule, the parser should call a callback function with a pointer to a config_t struct.
-
-The callback function should be defined in the main program, and should be called by the parser.
-
-The parser should be able to handle multiple config rules in the config file.
-
-Details about each option:
-
-- ip: is an IPv6 address, with a CIDR prefix, e.g. ::ffff:192.168.1.1/120
-- port: is a port number, or a range of port numbers, e.g. 502 or 5020-5025, or a combination of both, e.g. 502, 5020-5025. This should be a list of port numbers, not a single port number, or a range of port numbers.
-- slave_id: is a integer number, e.g. 1 or 2 or 3
-- function: is a integer number, this is a Modbus function code, e.g. 3 or 4, or 16
-- register_address: is a integer number, or a range of integer numbers, e.g. 0-100 or 100-200, or a combination of both, e.g. 0-100, 100-200. This should be stored as a list of integers, or a list of ranges of integers.
-
-The struct needs to track port min and max, and register_address min and max. Whene there is only one port number, or one register address, the min and max should be the same.
-
-For each min/max range the callback function should be called, so that the handler can add element based on the filter_t struct.
-
-*/
-
 int
 config_parse_file(FILE *file, void (*callback)(void *data, rule_t *rule), void *user_obj) {
     char line[MAX_LINE_LEN];
