@@ -1,5 +1,5 @@
 /*
- * This file is part of open-modbusgateway (https://github.com/ganehag/open-modbusgateway.
+ * This file is part of Open Modbus Gateway (omg) https://github.com/ganehag/open-modbusgateway.
  * Copyright (c) 2023 Mikael Ganehag Brorsson.
  *
  * This program is free software: you can redistribute it and/or modify
