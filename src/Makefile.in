@@ -86,7 +86,7 @@ POST_INSTALL = :
 NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
-bin_PROGRAMS = modbusgateway$(EXEEXT)
+bin_PROGRAMS = omg$(EXEEXT)
 subdir = src
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
@@ -99,14 +99,12 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
-am_modbusgateway_OBJECTS = modbusgateway-config_parser.$(OBJEXT) \
-	modbusgateway-filters.$(OBJEXT) \
-	modbusgateway-iprange.$(OBJEXT) modbusgateway-main.$(OBJEXT) \
-	modbusgateway-request.$(OBJEXT)
-modbusgateway_OBJECTS = $(am_modbusgateway_OBJECTS)
-modbusgateway_DEPENDENCIES =
-modbusgateway_LINK = $(CCLD) $(modbusgateway_CFLAGS) $(CFLAGS) \
-	$(AM_LDFLAGS) $(LDFLAGS) -o $@
+am_omg_OBJECTS = omg-config_parser.$(OBJEXT) omg-filters.$(OBJEXT) \
+	omg-iprange.$(OBJEXT) omg-main.$(OBJEXT) omg-request.$(OBJEXT)
+omg_OBJECTS = $(am_omg_OBJECTS)
+omg_DEPENDENCIES =
+omg_LINK = $(CCLD) $(omg_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o \
+	$@
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -122,11 +120,9 @@ am__v_at_1 =
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__maybe_remake_depfiles = depfiles
-am__depfiles_remade = ./$(DEPDIR)/modbusgateway-config_parser.Po \
-	./$(DEPDIR)/modbusgateway-filters.Po \
-	./$(DEPDIR)/modbusgateway-iprange.Po \
-	./$(DEPDIR)/modbusgateway-main.Po \
-	./$(DEPDIR)/modbusgateway-request.Po
+am__depfiles_remade = ./$(DEPDIR)/omg-config_parser.Po \
+	./$(DEPDIR)/omg-filters.Po ./$(DEPDIR)/omg-iprange.Po \
+	./$(DEPDIR)/omg-main.Po ./$(DEPDIR)/omg-request.Po
 am__mv = mv -f
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -144,8 +140,8 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(modbusgateway_SOURCES)
-DIST_SOURCES = $(modbusgateway_SOURCES)
+SOURCES = $(omg_SOURCES)
+DIST_SOURCES = $(omg_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -269,11 +265,11 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-modbusgateway_SOURCES = config_parser.c  filters.c  iprange.c  main.c  request.c
+omg_SOURCES = config_parser.c  filters.c  iprange.c  main.c  request.c
 
 # mosquitto, modbus, pthread and libconfig
-modbusgateway_CFLAGS = @MOSQUITTO_CFLAGS@ @MODBUS_CFLAGS@
-modbusgateway_LDADD = @MOSQUITTO_LIBS@ @MOSQUITTO_LDFLAGS@ @MODBUS_LIBS@ @MODBUS_LDFLAGS@ -lpthread
+omg_CFLAGS = @MOSQUITTO_CFLAGS@ @MODBUS_CFLAGS@
+omg_LDADD = @MOSQUITTO_LIBS@ @MOSQUITTO_LDFLAGS@ @MODBUS_LIBS@ @MODBUS_LDFLAGS@ -lpthread
 all: all-am
 
 .SUFFIXES:
@@ -350,9 +346,9 @@ uninstall-binPROGRAMS:
 clean-binPROGRAMS:
 	-test -z "$(bin_PROGRAMS)" || rm -f $(bin_PROGRAMS)
 
-modbusgateway$(EXEEXT): $(modbusgateway_OBJECTS) $(modbusgateway_DEPENDENCIES) $(EXTRA_modbusgateway_DEPENDENCIES) 
-	@rm -f modbusgateway$(EXEEXT)
-	$(AM_V_CCLD)$(modbusgateway_LINK) $(modbusgateway_OBJECTS) $(modbusgateway_LDADD) $(LIBS)
+omg$(EXEEXT): $(omg_OBJECTS) $(omg_DEPENDENCIES) $(EXTRA_omg_DEPENDENCIES) 
+	@rm -f omg$(EXEEXT)
+	$(AM_V_CCLD)$(omg_LINK) $(omg_OBJECTS) $(omg_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -360,11 +356,11 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/modbusgateway-config_parser.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/modbusgateway-filters.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/modbusgateway-iprange.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/modbusgateway-main.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/modbusgateway-request.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/omg-config_parser.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/omg-filters.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/omg-iprange.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/omg-main.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/omg-request.Po@am__quote@ # am--include-marker
 
 $(am__depfiles_remade):
 	@$(MKDIR_P) $(@D)
@@ -388,75 +384,75 @@ am--depfiles: $(am__depfiles_remade)
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
 
-modbusgateway-config_parser.o: config_parser.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(modbusgateway_CFLAGS) $(CFLAGS) -MT modbusgateway-config_parser.o -MD -MP -MF $(DEPDIR)/modbusgateway-config_parser.Tpo -c -o modbusgateway-config_parser.o `test -f 'config_parser.c' || echo '$(srcdir)/'`config_parser.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/modbusgateway-config_parser.Tpo $(DEPDIR)/modbusgateway-config_parser.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='config_parser.c' object='modbusgateway-config_parser.o' libtool=no @AMDEPBACKSLASH@
+omg-config_parser.o: config_parser.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(omg_CFLAGS) $(CFLAGS) -MT omg-config_parser.o -MD -MP -MF $(DEPDIR)/omg-config_parser.Tpo -c -o omg-config_parser.o `test -f 'config_parser.c' || echo '$(srcdir)/'`config_parser.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/omg-config_parser.Tpo $(DEPDIR)/omg-config_parser.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='config_parser.c' object='omg-config_parser.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(modbusgateway_CFLAGS) $(CFLAGS) -c -o modbusgateway-config_parser.o `test -f 'config_parser.c' || echo '$(srcdir)/'`config_parser.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(omg_CFLAGS) $(CFLAGS) -c -o omg-config_parser.o `test -f 'config_parser.c' || echo '$(srcdir)/'`config_parser.c
 
-modbusgateway-config_parser.obj: config_parser.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(modbusgateway_CFLAGS) $(CFLAGS) -MT modbusgateway-config_parser.obj -MD -MP -MF $(DEPDIR)/modbusgateway-config_parser.Tpo -c -o modbusgateway-config_parser.obj `if test -f 'config_parser.c'; then $(CYGPATH_W) 'config_parser.c'; else $(CYGPATH_W) '$(srcdir)/config_parser.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/modbusgateway-config_parser.Tpo $(DEPDIR)/modbusgateway-config_parser.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='config_parser.c' object='modbusgateway-config_parser.obj' libtool=no @AMDEPBACKSLASH@
+omg-config_parser.obj: config_parser.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(omg_CFLAGS) $(CFLAGS) -MT omg-config_parser.obj -MD -MP -MF $(DEPDIR)/omg-config_parser.Tpo -c -o omg-config_parser.obj `if test -f 'config_parser.c'; then $(CYGPATH_W) 'config_parser.c'; else $(CYGPATH_W) '$(srcdir)/config_parser.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/omg-config_parser.Tpo $(DEPDIR)/omg-config_parser.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='config_parser.c' object='omg-config_parser.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(modbusgateway_CFLAGS) $(CFLAGS) -c -o modbusgateway-config_parser.obj `if test -f 'config_parser.c'; then $(CYGPATH_W) 'config_parser.c'; else $(CYGPATH_W) '$(srcdir)/config_parser.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(omg_CFLAGS) $(CFLAGS) -c -o omg-config_parser.obj `if test -f 'config_parser.c'; then $(CYGPATH_W) 'config_parser.c'; else $(CYGPATH_W) '$(srcdir)/config_parser.c'; fi`
 
-modbusgateway-filters.o: filters.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(modbusgateway_CFLAGS) $(CFLAGS) -MT modbusgateway-filters.o -MD -MP -MF $(DEPDIR)/modbusgateway-filters.Tpo -c -o modbusgateway-filters.o `test -f 'filters.c' || echo '$(srcdir)/'`filters.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/modbusgateway-filters.Tpo $(DEPDIR)/modbusgateway-filters.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='filters.c' object='modbusgateway-filters.o' libtool=no @AMDEPBACKSLASH@
+omg-filters.o: filters.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(omg_CFLAGS) $(CFLAGS) -MT omg-filters.o -MD -MP -MF $(DEPDIR)/omg-filters.Tpo -c -o omg-filters.o `test -f 'filters.c' || echo '$(srcdir)/'`filters.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/omg-filters.Tpo $(DEPDIR)/omg-filters.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='filters.c' object='omg-filters.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(modbusgateway_CFLAGS) $(CFLAGS) -c -o modbusgateway-filters.o `test -f 'filters.c' || echo '$(srcdir)/'`filters.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(omg_CFLAGS) $(CFLAGS) -c -o omg-filters.o `test -f 'filters.c' || echo '$(srcdir)/'`filters.c
 
-modbusgateway-filters.obj: filters.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(modbusgateway_CFLAGS) $(CFLAGS) -MT modbusgateway-filters.obj -MD -MP -MF $(DEPDIR)/modbusgateway-filters.Tpo -c -o modbusgateway-filters.obj `if test -f 'filters.c'; then $(CYGPATH_W) 'filters.c'; else $(CYGPATH_W) '$(srcdir)/filters.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/modbusgateway-filters.Tpo $(DEPDIR)/modbusgateway-filters.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='filters.c' object='modbusgateway-filters.obj' libtool=no @AMDEPBACKSLASH@
+omg-filters.obj: filters.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(omg_CFLAGS) $(CFLAGS) -MT omg-filters.obj -MD -MP -MF $(DEPDIR)/omg-filters.Tpo -c -o omg-filters.obj `if test -f 'filters.c'; then $(CYGPATH_W) 'filters.c'; else $(CYGPATH_W) '$(srcdir)/filters.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/omg-filters.Tpo $(DEPDIR)/omg-filters.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='filters.c' object='omg-filters.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(modbusgateway_CFLAGS) $(CFLAGS) -c -o modbusgateway-filters.obj `if test -f 'filters.c'; then $(CYGPATH_W) 'filters.c'; else $(CYGPATH_W) '$(srcdir)/filters.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(omg_CFLAGS) $(CFLAGS) -c -o omg-filters.obj `if test -f 'filters.c'; then $(CYGPATH_W) 'filters.c'; else $(CYGPATH_W) '$(srcdir)/filters.c'; fi`
 
-modbusgateway-iprange.o: iprange.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(modbusgateway_CFLAGS) $(CFLAGS) -MT modbusgateway-iprange.o -MD -MP -MF $(DEPDIR)/modbusgateway-iprange.Tpo -c -o modbusgateway-iprange.o `test -f 'iprange.c' || echo '$(srcdir)/'`iprange.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/modbusgateway-iprange.Tpo $(DEPDIR)/modbusgateway-iprange.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='iprange.c' object='modbusgateway-iprange.o' libtool=no @AMDEPBACKSLASH@
+omg-iprange.o: iprange.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(omg_CFLAGS) $(CFLAGS) -MT omg-iprange.o -MD -MP -MF $(DEPDIR)/omg-iprange.Tpo -c -o omg-iprange.o `test -f 'iprange.c' || echo '$(srcdir)/'`iprange.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/omg-iprange.Tpo $(DEPDIR)/omg-iprange.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='iprange.c' object='omg-iprange.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(modbusgateway_CFLAGS) $(CFLAGS) -c -o modbusgateway-iprange.o `test -f 'iprange.c' || echo '$(srcdir)/'`iprange.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(omg_CFLAGS) $(CFLAGS) -c -o omg-iprange.o `test -f 'iprange.c' || echo '$(srcdir)/'`iprange.c
 
-modbusgateway-iprange.obj: iprange.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(modbusgateway_CFLAGS) $(CFLAGS) -MT modbusgateway-iprange.obj -MD -MP -MF $(DEPDIR)/modbusgateway-iprange.Tpo -c -o modbusgateway-iprange.obj `if test -f 'iprange.c'; then $(CYGPATH_W) 'iprange.c'; else $(CYGPATH_W) '$(srcdir)/iprange.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/modbusgateway-iprange.Tpo $(DEPDIR)/modbusgateway-iprange.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='iprange.c' object='modbusgateway-iprange.obj' libtool=no @AMDEPBACKSLASH@
+omg-iprange.obj: iprange.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(omg_CFLAGS) $(CFLAGS) -MT omg-iprange.obj -MD -MP -MF $(DEPDIR)/omg-iprange.Tpo -c -o omg-iprange.obj `if test -f 'iprange.c'; then $(CYGPATH_W) 'iprange.c'; else $(CYGPATH_W) '$(srcdir)/iprange.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/omg-iprange.Tpo $(DEPDIR)/omg-iprange.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='iprange.c' object='omg-iprange.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(modbusgateway_CFLAGS) $(CFLAGS) -c -o modbusgateway-iprange.obj `if test -f 'iprange.c'; then $(CYGPATH_W) 'iprange.c'; else $(CYGPATH_W) '$(srcdir)/iprange.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(omg_CFLAGS) $(CFLAGS) -c -o omg-iprange.obj `if test -f 'iprange.c'; then $(CYGPATH_W) 'iprange.c'; else $(CYGPATH_W) '$(srcdir)/iprange.c'; fi`
 
-modbusgateway-main.o: main.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(modbusgateway_CFLAGS) $(CFLAGS) -MT modbusgateway-main.o -MD -MP -MF $(DEPDIR)/modbusgateway-main.Tpo -c -o modbusgateway-main.o `test -f 'main.c' || echo '$(srcdir)/'`main.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/modbusgateway-main.Tpo $(DEPDIR)/modbusgateway-main.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='main.c' object='modbusgateway-main.o' libtool=no @AMDEPBACKSLASH@
+omg-main.o: main.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(omg_CFLAGS) $(CFLAGS) -MT omg-main.o -MD -MP -MF $(DEPDIR)/omg-main.Tpo -c -o omg-main.o `test -f 'main.c' || echo '$(srcdir)/'`main.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/omg-main.Tpo $(DEPDIR)/omg-main.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='main.c' object='omg-main.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(modbusgateway_CFLAGS) $(CFLAGS) -c -o modbusgateway-main.o `test -f 'main.c' || echo '$(srcdir)/'`main.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(omg_CFLAGS) $(CFLAGS) -c -o omg-main.o `test -f 'main.c' || echo '$(srcdir)/'`main.c
 
-modbusgateway-main.obj: main.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(modbusgateway_CFLAGS) $(CFLAGS) -MT modbusgateway-main.obj -MD -MP -MF $(DEPDIR)/modbusgateway-main.Tpo -c -o modbusgateway-main.obj `if test -f 'main.c'; then $(CYGPATH_W) 'main.c'; else $(CYGPATH_W) '$(srcdir)/main.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/modbusgateway-main.Tpo $(DEPDIR)/modbusgateway-main.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='main.c' object='modbusgateway-main.obj' libtool=no @AMDEPBACKSLASH@
+omg-main.obj: main.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(omg_CFLAGS) $(CFLAGS) -MT omg-main.obj -MD -MP -MF $(DEPDIR)/omg-main.Tpo -c -o omg-main.obj `if test -f 'main.c'; then $(CYGPATH_W) 'main.c'; else $(CYGPATH_W) '$(srcdir)/main.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/omg-main.Tpo $(DEPDIR)/omg-main.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='main.c' object='omg-main.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(modbusgateway_CFLAGS) $(CFLAGS) -c -o modbusgateway-main.obj `if test -f 'main.c'; then $(CYGPATH_W) 'main.c'; else $(CYGPATH_W) '$(srcdir)/main.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(omg_CFLAGS) $(CFLAGS) -c -o omg-main.obj `if test -f 'main.c'; then $(CYGPATH_W) 'main.c'; else $(CYGPATH_W) '$(srcdir)/main.c'; fi`
 
-modbusgateway-request.o: request.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(modbusgateway_CFLAGS) $(CFLAGS) -MT modbusgateway-request.o -MD -MP -MF $(DEPDIR)/modbusgateway-request.Tpo -c -o modbusgateway-request.o `test -f 'request.c' || echo '$(srcdir)/'`request.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/modbusgateway-request.Tpo $(DEPDIR)/modbusgateway-request.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='request.c' object='modbusgateway-request.o' libtool=no @AMDEPBACKSLASH@
+omg-request.o: request.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(omg_CFLAGS) $(CFLAGS) -MT omg-request.o -MD -MP -MF $(DEPDIR)/omg-request.Tpo -c -o omg-request.o `test -f 'request.c' || echo '$(srcdir)/'`request.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/omg-request.Tpo $(DEPDIR)/omg-request.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='request.c' object='omg-request.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(modbusgateway_CFLAGS) $(CFLAGS) -c -o modbusgateway-request.o `test -f 'request.c' || echo '$(srcdir)/'`request.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(omg_CFLAGS) $(CFLAGS) -c -o omg-request.o `test -f 'request.c' || echo '$(srcdir)/'`request.c
 
-modbusgateway-request.obj: request.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(modbusgateway_CFLAGS) $(CFLAGS) -MT modbusgateway-request.obj -MD -MP -MF $(DEPDIR)/modbusgateway-request.Tpo -c -o modbusgateway-request.obj `if test -f 'request.c'; then $(CYGPATH_W) 'request.c'; else $(CYGPATH_W) '$(srcdir)/request.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/modbusgateway-request.Tpo $(DEPDIR)/modbusgateway-request.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='request.c' object='modbusgateway-request.obj' libtool=no @AMDEPBACKSLASH@
+omg-request.obj: request.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(omg_CFLAGS) $(CFLAGS) -MT omg-request.obj -MD -MP -MF $(DEPDIR)/omg-request.Tpo -c -o omg-request.obj `if test -f 'request.c'; then $(CYGPATH_W) 'request.c'; else $(CYGPATH_W) '$(srcdir)/request.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/omg-request.Tpo $(DEPDIR)/omg-request.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='request.c' object='omg-request.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(modbusgateway_CFLAGS) $(CFLAGS) -c -o modbusgateway-request.obj `if test -f 'request.c'; then $(CYGPATH_W) 'request.c'; else $(CYGPATH_W) '$(srcdir)/request.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(omg_CFLAGS) $(CFLAGS) -c -o omg-request.obj `if test -f 'request.c'; then $(CYGPATH_W) 'request.c'; else $(CYGPATH_W) '$(srcdir)/request.c'; fi`
 
 ID: $(am__tagged_files)
 	$(am__define_uniq_tagged_files); mkid -fID $$unique
@@ -585,11 +581,11 @@ clean: clean-am
 clean-am: clean-binPROGRAMS clean-generic mostlyclean-am
 
 distclean: distclean-am
-		-rm -f ./$(DEPDIR)/modbusgateway-config_parser.Po
-	-rm -f ./$(DEPDIR)/modbusgateway-filters.Po
-	-rm -f ./$(DEPDIR)/modbusgateway-iprange.Po
-	-rm -f ./$(DEPDIR)/modbusgateway-main.Po
-	-rm -f ./$(DEPDIR)/modbusgateway-request.Po
+		-rm -f ./$(DEPDIR)/omg-config_parser.Po
+	-rm -f ./$(DEPDIR)/omg-filters.Po
+	-rm -f ./$(DEPDIR)/omg-iprange.Po
+	-rm -f ./$(DEPDIR)/omg-main.Po
+	-rm -f ./$(DEPDIR)/omg-request.Po
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -635,11 +631,11 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-am
-		-rm -f ./$(DEPDIR)/modbusgateway-config_parser.Po
-	-rm -f ./$(DEPDIR)/modbusgateway-filters.Po
-	-rm -f ./$(DEPDIR)/modbusgateway-iprange.Po
-	-rm -f ./$(DEPDIR)/modbusgateway-main.Po
-	-rm -f ./$(DEPDIR)/modbusgateway-request.Po
+		-rm -f ./$(DEPDIR)/omg-config_parser.Po
+	-rm -f ./$(DEPDIR)/omg-filters.Po
+	-rm -f ./$(DEPDIR)/omg-iprange.Po
+	-rm -f ./$(DEPDIR)/omg-main.Po
+	-rm -f ./$(DEPDIR)/omg-request.Po
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 

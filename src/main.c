@@ -569,7 +569,7 @@ main(int argc, char* argv[]) {
     memset(request_topic, 0, sizeof(request_topic));
     memset(response_topic, 0, sizeof(response_topic));
 
-    snprintf(clientid, sizeof(clientid) - 1, "modbusgateway_%d", getpid());
+    snprintf(clientid, sizeof(clientid) - 1, "omg_%d", getpid());
 
     if(argc < 5 || argc > 7) {
         usage();
