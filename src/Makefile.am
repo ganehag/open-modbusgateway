@@ -1,6 +1,6 @@
 bin_PROGRAMS = omg
 
-omg_SOURCES = config_parser.c  filters.c  iprange.c  main.c  request.c
+omg_SOURCES = config_parser.c filters.c iprange.c main.c request.c log.c mqtt_client.c
 
 # mosquitto, modbus, pthread and libconfig
 omg_CFLAGS = @MOSQUITTO_CFLAGS@ @MODBUS_CFLAGS@

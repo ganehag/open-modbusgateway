@@ -100,7 +100,8 @@ CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
 am_omg_OBJECTS = omg-config_parser.$(OBJEXT) omg-filters.$(OBJEXT) \
-	omg-iprange.$(OBJEXT) omg-main.$(OBJEXT) omg-request.$(OBJEXT)
+	omg-iprange.$(OBJEXT) omg-main.$(OBJEXT) omg-request.$(OBJEXT) \
+	omg-log.$(OBJEXT) omg-mqtt_client.$(OBJEXT)
 omg_OBJECTS = $(am_omg_OBJECTS)
 omg_DEPENDENCIES =
 omg_LINK = $(CCLD) $(omg_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o \
@@ -122,7 +123,8 @@ depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__maybe_remake_depfiles = depfiles
 am__depfiles_remade = ./$(DEPDIR)/omg-config_parser.Po \
 	./$(DEPDIR)/omg-filters.Po ./$(DEPDIR)/omg-iprange.Po \
-	./$(DEPDIR)/omg-main.Po ./$(DEPDIR)/omg-request.Po
+	./$(DEPDIR)/omg-log.Po ./$(DEPDIR)/omg-main.Po \
+	./$(DEPDIR)/omg-mqtt_client.Po ./$(DEPDIR)/omg-request.Po
 am__mv = mv -f
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -265,7 +267,7 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-omg_SOURCES = config_parser.c  filters.c  iprange.c  main.c  request.c
+omg_SOURCES = config_parser.c filters.c iprange.c main.c request.c log.c mqtt_client.c
 
 # mosquitto, modbus, pthread and libconfig
 omg_CFLAGS = @MOSQUITTO_CFLAGS@ @MODBUS_CFLAGS@
@@ -359,7 +361,9 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/omg-config_parser.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/omg-filters.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/omg-iprange.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/omg-log.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/omg-main.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/omg-mqtt_client.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/omg-request.Po@am__quote@ # am--include-marker
 
 $(am__depfiles_remade):
@@ -453,6 +457,34 @@ omg-request.obj: request.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='request.c' object='omg-request.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(omg_CFLAGS) $(CFLAGS) -c -o omg-request.obj `if test -f 'request.c'; then $(CYGPATH_W) 'request.c'; else $(CYGPATH_W) '$(srcdir)/request.c'; fi`
+
+omg-log.o: log.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(omg_CFLAGS) $(CFLAGS) -MT omg-log.o -MD -MP -MF $(DEPDIR)/omg-log.Tpo -c -o omg-log.o `test -f 'log.c' || echo '$(srcdir)/'`log.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/omg-log.Tpo $(DEPDIR)/omg-log.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='log.c' object='omg-log.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(omg_CFLAGS) $(CFLAGS) -c -o omg-log.o `test -f 'log.c' || echo '$(srcdir)/'`log.c
+
+omg-log.obj: log.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(omg_CFLAGS) $(CFLAGS) -MT omg-log.obj -MD -MP -MF $(DEPDIR)/omg-log.Tpo -c -o omg-log.obj `if test -f 'log.c'; then $(CYGPATH_W) 'log.c'; else $(CYGPATH_W) '$(srcdir)/log.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/omg-log.Tpo $(DEPDIR)/omg-log.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='log.c' object='omg-log.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(omg_CFLAGS) $(CFLAGS) -c -o omg-log.obj `if test -f 'log.c'; then $(CYGPATH_W) 'log.c'; else $(CYGPATH_W) '$(srcdir)/log.c'; fi`
+
+omg-mqtt_client.o: mqtt_client.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(omg_CFLAGS) $(CFLAGS) -MT omg-mqtt_client.o -MD -MP -MF $(DEPDIR)/omg-mqtt_client.Tpo -c -o omg-mqtt_client.o `test -f 'mqtt_client.c' || echo '$(srcdir)/'`mqtt_client.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/omg-mqtt_client.Tpo $(DEPDIR)/omg-mqtt_client.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mqtt_client.c' object='omg-mqtt_client.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(omg_CFLAGS) $(CFLAGS) -c -o omg-mqtt_client.o `test -f 'mqtt_client.c' || echo '$(srcdir)/'`mqtt_client.c
+
+omg-mqtt_client.obj: mqtt_client.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(omg_CFLAGS) $(CFLAGS) -MT omg-mqtt_client.obj -MD -MP -MF $(DEPDIR)/omg-mqtt_client.Tpo -c -o omg-mqtt_client.obj `if test -f 'mqtt_client.c'; then $(CYGPATH_W) 'mqtt_client.c'; else $(CYGPATH_W) '$(srcdir)/mqtt_client.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/omg-mqtt_client.Tpo $(DEPDIR)/omg-mqtt_client.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='mqtt_client.c' object='omg-mqtt_client.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(omg_CFLAGS) $(CFLAGS) -c -o omg-mqtt_client.obj `if test -f 'mqtt_client.c'; then $(CYGPATH_W) 'mqtt_client.c'; else $(CYGPATH_W) '$(srcdir)/mqtt_client.c'; fi`
 
 ID: $(am__tagged_files)
 	$(am__define_uniq_tagged_files); mkid -fID $$unique
@@ -584,7 +616,9 @@ distclean: distclean-am
 		-rm -f ./$(DEPDIR)/omg-config_parser.Po
 	-rm -f ./$(DEPDIR)/omg-filters.Po
 	-rm -f ./$(DEPDIR)/omg-iprange.Po
+	-rm -f ./$(DEPDIR)/omg-log.Po
 	-rm -f ./$(DEPDIR)/omg-main.Po
+	-rm -f ./$(DEPDIR)/omg-mqtt_client.Po
 	-rm -f ./$(DEPDIR)/omg-request.Po
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
@@ -634,7 +668,9 @@ maintainer-clean: maintainer-clean-am
 		-rm -f ./$(DEPDIR)/omg-config_parser.Po
 	-rm -f ./$(DEPDIR)/omg-filters.Po
 	-rm -f ./$(DEPDIR)/omg-iprange.Po
+	-rm -f ./$(DEPDIR)/omg-log.Po
 	-rm -f ./$(DEPDIR)/omg-main.Po
+	-rm -f ./$(DEPDIR)/omg-mqtt_client.Po
 	-rm -f ./$(DEPDIR)/omg-request.Po
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic

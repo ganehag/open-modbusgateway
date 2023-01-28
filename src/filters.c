@@ -1,5 +1,7 @@
 /*
- * This file is part of Open Modbus Gateway (omg) https://github.com/ganehag/open-modbusgateway.
+ * This file is part of Open Modbus Gateway (omg)
+ * https://github.com/ganehag/open-modbusgateway.
+ *
  * Copyright (c) 2023 Mikael Ganehag Brorsson.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -87,7 +89,6 @@ filter_match(filter_t *filters, request_t *request) {
     return -1;
 }
 
-
 // function to check if a message matches the content of request_t
 // return 0 on success, -1 on failure
 int
@@ -129,7 +130,8 @@ filter_match_one(filter_t *filter, request_t *request) {
     }
 
     // check if register is in range of min and max addresses
-    if (request->register_addr < filter->register_address_min || request->register_addr > filter->register_address_max) {
+    if (request->register_addr < filter->register_address_min ||
+        request->register_addr > filter->register_address_max) {
         return -1;
     }
 
@@ -149,7 +151,15 @@ filter_print(filter_t *filter) {
     inet_ntop(AF_INET6, &filter->iprange.netmask, netmask, INET6_ADDRSTRLEN);
 
     // print the filter in a structured way
-    printf("Filter: %s/%s:%d-%d, slave_id: %d, function_code: %d, register_address: %d-%d, is_last: %d\n",
-              ipaddr, netmask, filter->port_min, filter->port_max, filter->slave_id, filter->function_code,
-              filter->register_address_min, filter->register_address_max, filter->next == NULL);
+    printf("Filter: %s/%s:%d-%d, slave_id: %d, function_code: %d, "
+           "register_address: %d-%d, is_last: %d\n",
+           ipaddr,
+           netmask,
+           filter->port_min,
+           filter->port_max,
+           filter->slave_id,
+           filter->function_code,
+           filter->register_address_min,
+           filter->register_address_max,
+           filter->next == NULL);
 }

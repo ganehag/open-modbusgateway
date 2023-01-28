@@ -6,8 +6,8 @@
 typedef struct in6_addr ip6addr_t;
 
 typedef struct {
-	struct in6_addr ipaddr;
-	struct in6_addr netmask;
+    struct in6_addr ipaddr;
+    struct in6_addr netmask;
 } iprange_t;
 
 // error codes for ip_cidr_to_in6
@@ -20,12 +20,9 @@ typedef struct {
 int ip_in_range(const char *ip, const iprange_t *range);
 int ip_cidr_to_in6(const char *ip_cidr, iprange_t *range);
 int cidr_to_netmask(const int cidr, struct in6_addr *netmask);
-char *
-ip_cidr_strerror(const int error_code);
-int
-in6_addr_to_string(const struct in6_addr *addr, char *str);
+char *ip_cidr_strerror(const int error_code);
+int in6_addr_to_string(const struct in6_addr *addr, char *str);
 
-uint8_t
-in6_to_cidr_netmask(const struct in6_addr *addr);
+uint8_t in6_to_cidr_netmask(const struct in6_addr *addr);
 
 #endif // IPRANGE_H

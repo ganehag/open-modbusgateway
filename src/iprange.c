@@ -1,5 +1,7 @@
 /*
- * This file is part of Open Modbus Gateway (omg) https://github.com/ganehag/open-modbusgateway.
+ * This file is part of Open Modbus Gateway (omg)
+ * https://github.com/ganehag/open-modbusgateway.
+ *
  * Copyright (c) 2023 Mikael Ganehag Brorsson.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -15,16 +17,17 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <arpa/inet.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <arpa/inet.h>
 
 #include "iprange.h"
 
-/** 
- * Function to check if an IP (string) is within the IP range declared by struct in6_addr ip and struct in6_addr netmask.
-*/
+/**
+ * Function to check if an IP (string) is within the IP range declared by struct
+ * in6_addr ip and struct in6_addr netmask.
+ */
 
 // Check if char *ip is inside the range of ipaddr and netmask
 // return 0 on success, -1 on failure
@@ -41,16 +44,16 @@ ip_in_range(const char *ip, const iprange_t *iprange) {
         char iprange_ipaddr_byte = iprange->ipaddr.s6_addr[i];
         char iprange_netmask_byte = iprange->netmask.s6_addr[i];
 
-        // if ipaddr_byte is outside the range of iprange_ipaddr_byte and iprange_netmask_byte, return -1
-        if ((ipaddr_byte & iprange_netmask_byte) != (iprange_ipaddr_byte & iprange_netmask_byte)) {
+        // if ipaddr_byte is outside the range of iprange_ipaddr_byte and
+        // iprange_netmask_byte, return -1
+        if ((ipaddr_byte & iprange_netmask_byte) !=
+            (iprange_ipaddr_byte & iprange_netmask_byte)) {
             return -1;
         }
     }
 
     return 0;
 }
-
-
 
 int
 ip_cidr_to_in6(const char *ip_cidr, iprange_t *range) {
@@ -65,7 +68,7 @@ ip_cidr_to_in6(const char *ip_cidr, iprange_t *range) {
     }
 
     char *ip = strdup(ip_cidr);
-    char *slash = strchr(ip, '/');  // find the slash in the string
+    char *slash = strchr(ip, '/'); // find the slash in the string
     if (slash == NULL) {
         return IP_CIDR_INVALID_INPUT;
     }
@@ -91,7 +94,7 @@ ip_cidr_to_in6(const char *ip_cidr, iprange_t *range) {
     }
 
     // create netmask using cidr_to_netmask function
-    if(cidr_to_netmask(netmask, &(range->netmask)) != 0) {
+    if (cidr_to_netmask(netmask, &(range->netmask)) != 0) {
         return IP_CIDR_INVALID_CIDR;
     }
 
@@ -124,7 +127,8 @@ cidr_to_netmask(const int cidr, struct in6_addr *netmask) {
 
     // fill the last chunk with the remaining bits
     for (int i = 0; i < last_chunk_bits; i++) {
-        netmask->s6_addr[full_chunks] |= (0x80 >> i);  // set the bit to 1, starting from the MSB
+        netmask->s6_addr[full_chunks] |=
+            (0x80 >> i); // set the bit to 1, starting from the MSB
     }
 
     return 0;
@@ -152,7 +156,7 @@ in6_addr_to_string(const struct in6_addr *addr, char *str) {
 
 char *
 ip_cidr_strerror(const int error_code) {
-    switch(error_code) {
+    switch (error_code) {
     case IP_CIDR_OK:
         return "IP_CIDR_OK";
     case IP_CIDR_INVALID_INPUT:

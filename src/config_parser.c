@@ -1,5 +1,7 @@
 /*
- * This file is part of Open Modbus Gateway (omg) https://github.com/ganehag/open-modbusgateway.
+ * This file is part of Open Modbus Gateway (omg)
+ * https://github.com/ganehag/open-modbusgateway.
+ *
  * Copyright (c) 2023 Mikael Ganehag Brorsson.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -15,10 +17,12 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <string.h>
-#include <stdlib.h>
-#include <errno.h>
 #include <ctype.h>
+#include <errno.h>
+#include <regex.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 #include "config_parser.h"
 
@@ -30,7 +34,7 @@ strto_uint32(const char *str, char **endptr, int base) {
         errno = ERANGE;
         return UINT32_MAX;
     }
-    return (uint32_t) value;
+    return (uint32_t)value;
 }
 
 char *
@@ -40,10 +44,12 @@ trim(char *str, size_t len) {
     }
     int i = 0;
     int j = len - 1;
-    while (i <= j && isspace(str[i])) i++; // skip leading whitespace
-    while (j >= i && isspace(str[j])) j--; // skip trailing whitespace
-    str[j+1] = '\0'; // null-terminate the trimmed string
-    return str+i;
+    while (i <= j && isspace(str[i]))
+        i++; // skip leading whitespace
+    while (j >= i && isspace(str[j]))
+        j--;           // skip trailing whitespace
+    str[j + 1] = '\0'; // null-terminate the trimmed string
+    return str + i;
 }
 
 char *
@@ -52,8 +58,9 @@ trim_left(char *str, size_t len) {
         return str; // input string is empty or null
     }
     size_t i = 0;
-    while (i < len && isspace(str[i])) i++; // skip leading whitespace
-    return str+i;
+    while (i < len && isspace(str[i]))
+        i++; // skip leading whitespace
+    return str + i;
 }
 
 char *
@@ -63,14 +70,44 @@ trim_token(char *str, char trim_char, size_t len) {
     }
     int i = 0;
     int j = len - 1;
-    while (i <= j && str[i] == trim_char) i++; // skip leading trim_char
-    while (j >= i && str[j] == trim_char) j--; // skip trailing trim_char
-    str[j+1] = '\0'; // null-terminate the trimmed string
-    return str+i;
+    while (i <= j && str[i] == trim_char)
+        i++; // skip leading trim_char
+    while (j >= i && str[j] == trim_char)
+        j--;           // skip trailing trim_char
+    str[j + 1] = '\0'; // null-terminate the trimmed string
+    return str + i;
+}
+
+char *
+strsep_ws(char **stringp) {
+    char *begin, *end;
+    begin = *stringp;
+
+    if (begin == NULL) {
+        return NULL;
+    }
+
+    // Find the end of the token by using isspace
+    end = begin;
+    while (*end && !isspace(*end)) {
+        end++;
+    }
+
+    while (*end && isspace(*end)) {
+        *end++ = '\0';
+    }
+
+    if (*end) {
+        *stringp = end;
+    } else {
+        *stringp = NULL;
+    }
+
+    return begin;
 }
 
 int
-config_parse_file(FILE *file, void (*callback)(void *data, rule_t *rule), void *user_obj) {
+config_parse_file(FILE *file, config_t *config) {
     char line[MAX_LINE_LEN];
     rule_t rule;
 
@@ -78,261 +115,445 @@ config_parse_file(FILE *file, void (*callback)(void *data, rule_t *rule), void *
     int in_config_rule = 0;
     int in_config_mqtt = 0;
 
-    int line_number = -1;  // -1 because of the first line, which will increment line_number to 0
+    int line_number = -1; // -1 because of the first line, which will increment
+                          // line_number to 0
+
+    // zero out the config struct
+    memset(config, 0, sizeof(config_t));
+
+    // set some default values
+    config->port = 1883;
+    config->keepalive = 60;
+    config->qos = 1;
+    config->retain = 0;
+    // config->timeout = 10;
+    // config->reconnect_delay = 5;
+
+    sprintf(config->client_id, "omg_client_%d", getpid());
 
     // read a line from the config file
     while (fgets(line, MAX_LINE_LEN, file) != NULL) {
-    	line_number++;
+        line_number++;
 
-		line[strcspn(line, "\n")] = 0;  // remove newline by replacing it with null byte
+        // remove newline by replacing it with null byte
+        line[strcspn(line, "\n")] = 0;
 
-		line[strcspn(line, "#")] = 0;  // remove everything else after # by replacing it with null byte
+        // remove everything else after # by replacing it with null byte
+        line[strcspn(line, "#")] = 0;
 
-		// check for start of config rule, a rule is a type and config is the accepted type
-		if (strncmp(line, "config rule", 11) == 0) {
-			in_config_rule = 1;
-			in_config = 1;
-			memset(&rule, 0, sizeof(rule_t)); // clear config struct
-			continue;
-		}
+        // check for start of config rule, a rule is a type and config is the
+        // accepted type
+        if (strncmp(line, "config rule", 11) == 0) {
+            in_config_rule = 1;
+            in_config = 1;
+            memset(&rule, 0, sizeof(rule_t)); // clear config struct
+            continue;
+        }
 
-		// check for end of config rule
+        // check for end of config rule
         if (in_config_rule && line[0] == '\0') {
-        	// ensure the callback function is not NULL
-        	if (callback != NULL) {
-        		// call the callback function
-        		callback(user_obj, &rule);
-			}
+            handle_filter_row(config, &rule);
 
             in_config_rule = 0;
             in_config = 0;
             continue;
         }
 
-		// check for start of config mqtt, a rule is a type and config is the accepted type
-		if (strncmp(line, "config mqtt", 11) == 0) {
-			in_config_mqtt = 1;
-			in_config = 1;
-			// FIXME: clear config struct for mqtt
-			continue;
-		}
+        // check for start of config mqtt, a rule is a type and config is the
+        // accepted type
+        if (strncmp(line, "config mqtt", 11) == 0) {
+            in_config_mqtt = 1;
+            in_config = 1;
+            // FIXME: clear config struct for mqtt
+            continue;
+        }
 
-		// check for end of config mqtt
-		if (in_config_mqtt && line[0] == '\0') {
-			// ensure the callback function is not NULL
-			if (callback != NULL) {
-				// call the callback function
-				// callback(user_obj, &rule);
-			}
+        // check for end of config mqtt
+        if (in_config_mqtt && line[0] == '\0') {
+            in_config_mqtt = 0;
+            in_config = 0;
+            continue;
+        }
 
-			in_config_mqtt = 0;
-			in_config = 0;
-			continue;
-		}
+        // skip empty lines in a safe way
+        if (line[0] == 0) {
+            continue;
+        }
 
-		// skip empty lines in a safe way
-		if (line[0] == 0) {
-			continue;
-		}
+        // parse option
+        if (in_config) {
+            char *opt_line = trim(line, strlen(line));
+            char *opt = strsep_ws(&opt_line);
+            char *name = strsep_ws(&opt_line);
+            char *value = opt_line;
 
-		// parse option
-		if (in_config) {
-			char *opt_line = trim(line, strlen(line));
-			char *opt = strsep(&opt_line, " ");
-			char *name = strsep(&opt_line, " ");
-			char *value = opt_line;
+            if (opt == NULL || name == NULL || value == NULL) {
+                continue;
+            }
 
-			if (opt == NULL || name == NULL || value == NULL) {
-				continue;
-			}
+            // trim option
+            opt = trim(opt, strlen(opt));
 
-			// trim option
-			opt = trim(opt, strlen(opt));
+            // ensure this is a valid option element
+            if (strncmp(opt, "option", 6) != 0) {
+                continue; // skip this line
+            }
 
-			// ensure this is a valid option element
-			if (strncmp(opt, "option", 6) != 0) {
-				continue;  // skip this line
-			}
+            name = trim(name, strlen(name));
+            value = trim(value, strlen(value));
 
-			name = trim(name, strlen(name));
-			value = trim(value, strlen(value));
+            // option_value should be quoted, remove quotes, " or ' (leading),
+            // use trim_token
+            value = trim_token(value, '\'', strlen(value));
+            value = trim_token(value, '"', strlen(value));
 
-			// option_value should be quoted, remove quotes, " or ' (leading), use trim_token
-			value = trim_token(value, '\'', strlen(value));
-			value = trim_token(value, '"', strlen(value));
+            if (in_config_rule) {
+                if (strncmp(name, "ip", 2) == 0) {
+                    // copy ip to config.ip
+                    strncpy(rule.ip, value, sizeof(rule.ip));
+                } else if (strncmp(name, "port", 4) == 0) {
+                    // parse_option_port has the following signature:
+                    int parse_error = parse_option_range(value, rule.port);
+                    if (parse_error != 0) {
+                        return CONFIG_PARSER_ERROR_INVALID_PORT;
+                    }
+                } else if (strncmp(name, "slave_id", 8) == 0) {
+                    rule.slave_id = atoi(value);
+                } else if (strncmp(name, "function", 8) == 0) {
+                    rule.function = atoi(value);
+                } else if (strncmp(name, "register_address", 16) == 0) {
+                    int parse_error =
+                        parse_option_range(value, rule.register_addr);
+                    if (parse_error != 0) {
+                        return CONFIG_PARSER_ERROR_INVALID_REGISTER_ADDRESS;
+                    }
+                }
+            } else if (in_config_mqtt) {
+                // MQTT config options
+                if (strncmp(name, "host", 4) == 0) {
+                    strncpy(config->host, value, sizeof(config->host));
+                } else if (strncmp(name, "port", 4) == 0) {
+                    config->port = atoi(value);
+                } else if (strncmp(name, "keepalive", 9) == 0) {
+                    config->keepalive = atoi(value);
+                } else if (strncmp(name, "username", 8) == 0) {
+                    strncpy(config->username, value, sizeof(config->username));
+                } else if (strncmp(name, "password", 8) == 0) {
+                    strncpy(config->password, value, sizeof(config->password));
+                } else if (strncmp(name, "client_id", 9) == 0) {
+                    strncpy(
+                        config->client_id, value, sizeof(config->client_id));
+                } else if (strncmp(name, "qos", 3) == 0) {
+                    config->qos = atoi(value);
+                } else if (strncmp(name, "retain", 6) == 0) {
+                    if (strncmp(value, "true", 4) == 0 ||
+                        strncmp(value, "1", 1) == 0) {
+                        config->retain = 1;
+                    } else if (strncmp(value, "false", 5) == 0 ||
+                               strncmp(value, "0", 1) == 0) {
+                        config->retain = 0;
+                    }
+                } else if (strncmp(name, "clean_session", 13) == 0) {
+                    if (strncmp(value, "true", 4) == 0 ||
+                        strncmp(value, "1", 1) == 0) {
+                        config->clean_session = 1;
+                    } else if (strncmp(value, "false", 5) == 0 ||
+                               strncmp(value, "0", 1) == 0) {
+                        config->clean_session = 0;
+                    }
+                } else if (strncmp(name, "ca_cert", 7) == 0) {
+                    // server certificate
+                    strncpy(config->ca_cert_path,
+                            value,
+                            sizeof(config->ca_cert_path));
+                } else if (strncmp(name, "cert", 4) == 0) {
+                    // client certificate
+                    strncpy(
+                        config->cert_path, value, sizeof(config->cert_path));
+                } else if (strncmp(name, "key", 3) == 0) {
+                    // client key
+                    strncpy(config->key_path, value, sizeof(config->key_path));
+                } else if (strncmp(name, "verify", 6) == 0) {
+                    // verify the server certificate
+                    // should not be used in production
+                    if (strncmp(value, "true", 4) == 0 ||
+                        strncmp(value, "1", 1) == 0) {
+                        config->verify = 1;
+                    } else if (strncmp(value, "false", 5) == 0 ||
+                               strncmp(value, "0", 1) == 0) {
+                        config->verify = 0;
+                    }
+                } else if (strncmp(name, "request_topic", 13) == 0) {
+                    strncpy(config->request_topic,
+                            value,
+                            sizeof(config->request_topic));
+                } else if (strncmp(name, "response_topic", 14) == 0) {
+                    strncpy(config->response_topic,
+                            value,
+                            sizeof(config->response_topic));
+                }
+            }
+        }
+    }
 
-			if(in_config_rule) {
-				if (strncmp(name, "ip", 2) == 0) {
-					// copy ip to config.ip
-					strncpy(rule.ip, value, sizeof(rule.ip));
-				} else if (strncmp(name, "port", 4) == 0) {
-					// parse_option_port has the following signature:
-					int parse_error = parse_option_range(value, rule.port);
-					if (parse_error != 0) {
-						return CONFIG_PARSER_ERROR_INVALID_PORT;
-					}
-				} else if (strncmp(name, "slave_id", 8) == 0) {
-					rule.slave_id = atoi(value);
-				} else if (strncmp(name, "function", 8) == 0) {
-					rule.function = atoi(value);
-				} else if (strncmp(name, "register_address", 16) == 0) {
-					int parse_error = parse_option_range(value, rule.register_addr);
-					if (parse_error != 0) {
-						return CONFIG_PARSER_ERROR_INVALID_REGISTER_ADDRESS;
-					}
-				}
-			} else if (in_config_mqtt) {
-				// MQTT config options
+    if (in_config_rule) {
+        handle_filter_row(config, &rule);
+    }
 
-				if (strncmp(name, "host", 4) == 0) {
-					// ip or hostname
-				} else if(strncmp(name, "port", 4) == 0) {
-					// port number
-				} else if(strncmp(name, "keepalive", 9) == 0) {
-					// keepalive in seconds
-				} else if(strncmp(name, "username", 8) == 0) {
-					// username for authentication
-				} else if(strncmp(name, "password", 8) == 0) {
-					// password for authentication
-				} else if(strncmp(name, "client_id", 9) == 0) {
-					// use a fixed client id
-				} else if(strncmp(name, "qos", 3) == 0) {
-					// qos level
-				} else if(strncmp(name, "retain", 6) == 0) {
-					// retain flag
-				} else if(strncmp(name, "clean_session", 13) == 0) {
-					// clean session when connecting
-				} else if(strncmp(name, "ca_cert", 7) == 0) {
-					// server certificate
-				} else if(strncmp(name, "cert", 4) == 0) {
-					// client certificate
-				} else if(strncmp(name, "key", 3) == 0) {
-					// client key
-				} else if(strncmp(name, "verify", 6) == 0) {
-					// verify the server certificate
-					// should not be used in production
-				}
-			}
-		}
-	}
-
-	if(in_config_rule) {
-		// execute callback function, if it is not NULL
-		// otherwise the last config rule may be ignored
-		// it all depends on how many \n are in the file
-		if (callback != NULL) {
-    		// call the callback function
-    		callback(user_obj, &rule);
-		}
-	}
-
-	return 0;
+    return 0;
 }
 
 int
-config_parse(char *filename, void (*callback)(void *data, rule_t *rule), void *user_obj) {
-	// open file
-	FILE *file = fopen(filename, "r");
+config_parse(char *filename, config_t *config) {
+    // open file
+    FILE *file = fopen(filename, "r");
 
-	if (file == NULL) {
-		return -1;
-	}
+    if (file == NULL) {
+        return -1;
+    }
 
-	// parse file
-	int error = config_parse_file(file, callback, user_obj);
+    // parse file
+    int error = config_parse_file(file, config);
 
-	// close file
-	fclose(file);
+    // close file
+    fclose(file);
 
-	return error;
+    return error;
 }
 
-// list is a list of range_u32_t, so we need to parse the option_value, and add it to the list
-// the size if fixed and defined by the MAX_RANGES constant
+// list is a list of range_u32_t, so we need to parse the option_value, and add
+// it to the list the size if fixed and defined by the MAX_RANGES constant
 int
 parse_option_range(char *option_value, range_u32_t *list) {
-	// copy option_value to a new buffer, so we can modify it, using a fixed size buffer
-	char buffer[MAX_LINE_LEN];
-	memset(buffer, 0, MAX_LINE_LEN);
-	strncpy(buffer, option_value, MAX_LINE_LEN);
+    // copy option_value to a new buffer, so we can modify it, using a fixed
+    // size buffer
+    char buffer[MAX_LINE_LEN];
+    memset(buffer, 0, MAX_LINE_LEN);
+    strncpy(buffer, option_value, MAX_LINE_LEN);
 
-	// clear the list, just in case
-	memset(list, 0, sizeof(range_u32_t) * MAX_RANGES);
+    // clear the list, just in case
+    memset(list, 0, sizeof(range_u32_t) * MAX_RANGES);
 
-	uint16_t i = 0;  // index for list
+    uint16_t i = 0; // index for list
 
-	// split option_value by comma
-	char *saveptr; // for strtok_r
-	char *token = strtok_r(buffer, ",", &saveptr);
+    // split option_value by comma
+    char *saveptr; // for strtok_r
+    char *token = strtok_r(buffer, ",", &saveptr);
 
-	// loop through the comma separated tokens, and stop if we reach the max number of ranges
-	while (token != NULL && i < MAX_RANGES) {
-		// start by skipping leading spaces or tabs or any other whitespace
-		token = trim_left(token, strlen(token));
+    // loop through the comma separated tokens, and stop if we reach the max
+    // number of ranges
+    while (token != NULL && i < MAX_RANGES) {
+        // start by skipping leading spaces or tabs or any other whitespace
+        token = trim_left(token, strlen(token));
 
-		// check if token is a range
-		char *range = strchr(token, '-');
+        // check if token is a range
+        char *range = strchr(token, '-');
 
-		if (range != NULL) {
-			// token is a range
-			// split token on dash
-			char *token_min = strtok(token, "-");
-			char *token_max = strtok(NULL, "-");
+        if (range != NULL) {
+            // token is a range
+            // split token on dash
+            char *token_min = strtok(token, "-");
+            char *token_max = strtok(NULL, "-");
 
-			errno = 0;  // reset errno
-			uint32_t min = strto_uint32(token_min, NULL, 10);
-			// check of overflow or underflow
-			if (errno == ERANGE) {
-				return PARSE_RANGE_ERROR_OVERFLOW;
-			}
+            errno = 0; // reset errno
+            uint32_t min = strto_uint32(token_min, NULL, 10);
+            // check of overflow or underflow
+            if (errno == ERANGE) {
+                return PARSE_RANGE_ERROR_OVERFLOW;
+            }
 
-			errno = 0;  // reset errno
-			uint32_t max = strto_uint32(token_max, NULL, 10);
-			// check of overflow or underflow
-			if (errno == ERANGE) {
-				return PARSE_RANGE_ERROR_OVERFLOW;
-			}
+            errno = 0; // reset errno
+            uint32_t max = strto_uint32(token_max, NULL, 10);
+            // check of overflow or underflow
+            if (errno == ERANGE) {
+                return PARSE_RANGE_ERROR_OVERFLOW;
+            }
 
-			// check for errors
-			if (errno != 0 || min > max) {
-				return PARSE_RANGE_ERROR_INVALID_RANGE;
-			}
+            // check for errors
+            if (errno != 0 || min > max) {
+                return PARSE_RANGE_ERROR_INVALID_RANGE;
+            }
 
-			// add range to list
-			list[i].min = min;
-			list[i].max = max;
-			list[i].initialized = 1;
+            // add range to list
+            list[i].min = min;
+            list[i].max = max;
+            list[i].initialized = 1;
 
-			// increment i
-			i++;
-		} else {
-			errno = 0;  // reset errno
+            // increment i
+            i++;
+        } else {
+            errno = 0; // reset errno
 
-			// token is a single number
-			uint32_t number = strtoul(token, NULL, 10);
+            // token is a single number
+            uint32_t number = strtoul(token, NULL, 10);
 
-			// check for errors
-			if (errno != 0) {
-				return PARSE_RANGE_ERROR_INVALID_NUMBER;
-			}
+            // check for errors
+            if (errno != 0) {
+                return PARSE_RANGE_ERROR_INVALID_NUMBER;
+            }
 
-			// add number to list
-			list[i].min = number;
-			list[i].max = number;
-			list[i].initialized = 1;
+            // add number to list
+            list[i].min = number;
+            list[i].max = number;
+            list[i].initialized = 1;
 
-			// increment i
-			i++;
-		}
+            // increment i
+            i++;
+        }
 
-		// get next token
-		token = strtok_r(NULL, ",", &saveptr);
-	}
+        // get next token
+        token = strtok_r(NULL, ",", &saveptr);
+    }
 
-	// check if i is out of range, if token is not NULL, then we have more ranges than MAX_RANGES
-	if (token != NULL) {
-		return PARSE_RANGE_ERROR_MAX_RANGES;
-	}
+    // check if i is out of range, if token is not NULL, then we have more
+    // ranges than MAX_RANGES
+    if (token != NULL) {
+        return PARSE_RANGE_ERROR_MAX_RANGES;
+    }
 
-	return 0;
+    return 0;
+}
+
+void
+handle_filter_row(config_t *config, rule_t *rule) {
+    // loop over all the port ranges until we find a rule that is not
+    // initialized
+    for (int i = 0; i < MAX_RANGES; i++) {
+        if (rule->port[i].initialized == 0) {
+            break;
+        }
+    }
+
+    // the same, but for register_address
+    for (int i = 0; i < MAX_RANGES; i++) {
+        if (rule->register_addr[i].initialized == 0) {
+            break;
+        }
+    }
+
+    // add the rule to the filter, so we can check it later
+    // since each rule contains multiple port ranges, and multiple register
+    // address ranges, we need to add the rule multiple times
+
+    // loop over all the port ranges until we find a rule that is not
+    // initialized
+    for (int i = 0; i < MAX_RANGES; i++) {
+        if (rule->port[i].initialized == 0) {
+            break;
+        }
+        // loop over all the register address ranges until we find a rule that
+        // is not initialized
+        for (int j = 0; j < MAX_RANGES; j++) {
+            if (rule->register_addr[j].initialized == 0) {
+                break;
+            }
+
+            filter_t *new_filter = calloc(1, sizeof(filter_t));
+            if (ip_cidr_to_in6(rule->ip, &new_filter->iprange) != 0) {
+                return; // unable to parse ip
+            }
+
+            new_filter->slave_id = rule->slave_id;
+            new_filter->function_code = rule->function;
+            new_filter->port_min = rule->port[i].min;
+            new_filter->port_max = rule->port[i].max;
+            new_filter->register_address_min = rule->register_addr[j].min;
+            new_filter->register_address_max = rule->register_addr[j].max;
+
+            // add the rule to the filter
+            filter_add(&config->head, new_filter);
+        }
+    }
+}
+
+int
+validate_config(config_t *config) {
+    // check if config is NULL
+    if (config == NULL) {
+        return -1;
+    }
+
+    // check if config->rules is NULL
+    if (config->head == NULL) {
+        return -2;
+    }
+
+    int valid_ipv4 = is_valid_ipv4(config->host);
+    int valid_ipv6 = is_valid_ipv6(config->host);
+    int valid_hostname = is_valid_hostname(config->host);
+
+    // if all of them are false, then the hostname is invalid
+    if (!valid_hostname && !valid_ipv4 && !valid_ipv6) {
+        return -3;
+    }
+
+    if (config->port == 0) {
+        return -4;
+    }
+
+    // ensure client id is not empty
+    if (strlen(config->client_id) == 0) {
+        return -5;
+    }
+
+    // ensure qos is between 0 and 2
+    if (config->qos > 2) {
+        return -6;
+    }
+
+    // if one of the tls options is set, then all of them must be set
+    if (strlen(config->ca_cert_path) > 0 || strlen(config->cert_path) > 0 ||
+        strlen(config->key_path) > 0) {
+        if (strlen(config->ca_cert_path) == 0 ||
+            strlen(config->cert_path) == 0 || strlen(config->key_path) == 0) {
+            return -7;
+        }
+    }
+
+    // ensure request_topic is not empty
+    if (strlen(config->request_topic) == 0) {
+        return -8;
+    }
+
+    // ensure response_topic is not empty
+    if (strlen(config->response_topic) == 0) {
+        return -9;
+    }
+
+    return 0;
+}
+
+int
+is_valid_ipv4(const char *ip) {
+    struct sockaddr_in sa;
+    int result = inet_pton(AF_INET, ip, &(sa.sin_addr));
+    return result != 0;
+}
+
+int
+is_valid_ipv6(const char *ip) {
+    struct sockaddr_in6 sa;
+    int result = inet_pton(AF_INET6, ip, &(sa.sin6_addr));
+    return result != 0;
+}
+
+int
+is_valid_hostname(const char *hostname) {
+    // Regular expression to match hostname
+    char *pattern =
+        "^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\\-]*[a-zA-Z0-9])\\.)*(["
+        "A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\\-]*[A-Za-z0-9])$";
+
+    regex_t re;
+    if (regcomp(&re, pattern, REG_EXTENDED | REG_NOSUB) != 0) {
+        return 0;
+    }
+
+    int status = regexec(&re, hostname, 0, NULL, 0);
+    regfree(&re);
+
+    if (status != 0) {
+        return 0;
+    }
+    return 1;
 }

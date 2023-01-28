@@ -8,24 +8,24 @@
 #include "iprange.h"
 
 typedef struct filter {
-	iprange_t iprange;
+    iprange_t iprange;
 
-	// Port to filter
-	uint16_t port_min;
-	uint16_t port_max;
+    // Port to filter
+    uint16_t port_min;
+    uint16_t port_max;
 
-	// Slave ID to filter
-	uint8_t slave_id;
+    // Slave ID to filter
+    uint8_t slave_id;
 
-	// Function Code to filter
-	uint8_t function_code;
+    // Function Code to filter
+    uint8_t function_code;
 
-	// Register Address to filter
-	uint16_t register_address_min;
-	uint16_t register_address_max;
+    // Register Address to filter
+    uint16_t register_address_min;
+    uint16_t register_address_max;
 
-	// pointer to next filter
-	struct filter *next;
+    // pointer to next filter
+    struct filter *next;
 } filter_t;
 
 filter_t *
