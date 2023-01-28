@@ -86,4 +86,49 @@ The checks are configurable via the configuration file. The configuration file i
 
 # Configuration
 
-FIXME
+The config file is used to specify the settings for the application. The file must be in plain text format.
+
+## Format
+
+The file is divided into sections, each section starts with a `config` keyword followed by the name of the section.
+Each section contains multiple options, each option is specified on a new line and starts with the `option` keyword followed by the name of the option and its value.
+
+```text
+config <section_name>
+	option <option_name> <option_value>
+	option <option_name> <option_value>
+	...
+```
+
+Example config file:
+
+```text
+config mqtt
+	option host '127.0.0.1'
+	option port '1883'
+	option request_topic 'request'
+	option response_topic 'response'
+
+config rule
+	option ip '::ffff:127.0.0.1/128'
+	option port '1502'
+	option slave_id '1'
+	option function '3'
+	option register_address '0-65535'
+```
+
+## Sections
+
+- `mqtt`: This section contains the settings for the MQTT connection. It has the following options:
+  - `host`: The hostname or IP address of the MQTT broker.
+  - `port`: The port number of the MQTT broker.
+  - `request_topic`: The topic used for receiving requests.
+  - `response_topic`: The topic used to send responses.
+
+- `rule`: This section contains the settings for the Modbus communication filtering. It can appear multiple times in the config file. Each section has the following options:
+  - `ip`: The IP address of the Modbus device, it must be an IPv6 address or an IPv4 address encoded in IPv6 format, and it must also include a subnet mask.
+  - `port`: The port number of the Modbus device. It can be a single number or a range of numbers separated by a '-'.
+  - `slave_id`: The slave ID of the Modbus device.
+  - `function`: The function code used for the Modbus communication.
+  - `register_address`: The range of register addresses used for the Modbus communication, it should be in the form of 'start-end'.
+
