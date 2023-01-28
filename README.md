@@ -4,6 +4,8 @@ This software is an Open Source alternative to Teltonikas' Modbus Gateway (`modb
 
 It is written in C and uses the [libmodbus](https://libmodbus.org/) library. It also depends on the [libmosquitto](https://mosquitto.org/) library for MQTT communication.
 
+This software used to be a drop in replacement for the Teltonika Modbus Gateway software, but it has since been rewritten and is no longer compatible. It comes with a new configuration file format and supports a lot more features.
+
 > **NOTE:** This software is in no way affiliated with Teltonika.
 
 
@@ -95,8 +97,8 @@ Each section contains multiple options, each option is specified on a new line a
 
 ```text
 config <section_name>
-	option <option_name> <option_value>
-	option <option_name> <option_value>
+	option <option_name> '<option_value>'
+	option <option_name> '<option_value>'
 	...
 ```
 
