@@ -106,6 +106,12 @@ Example config file:
 config mqtt
 	option host '127.0.0.1'
 	option port '1883'
+	option keepalive '60'
+	option username 'user'
+	option password 'pass'
+	option qos '0'
+	option retain 'false'
+	option clean_session 'true'
 	option request_topic 'request'
 	option response_topic 'response'
 
@@ -122,6 +128,12 @@ config rule
 - `mqtt`: This section contains the settings for the MQTT connection. It has the following options:
   - `host`: The hostname or IP address of the MQTT broker.
   - `port`: The port number of the MQTT broker.
+  - `keepalive`: The keepalive interval in seconds.
+  - `username`: The username for the MQTT broker.
+  - `password`: The password for the MQTT broker.
+  - `qos`: The quality of service for the MQTT connection. Must be either 0, 1 or 2.
+  - `retain`: Whether to retain the MQTT messages. Must be either `true` or `false`.
+  - `clean_session`: Whether to use a clean session for the MQTT connection. Must be either `true` or `false`.
   - `request_topic`: The topic used for receiving requests.
   - `response_topic`: The topic used to send responses.
 
