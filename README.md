@@ -1,5 +1,5 @@
 <p align="center">
-    <img src="https://raw.githubusercontent.com/open-modbusgateway/open-modbusgateway/master/docs/images/timmy.svg" alt="Open Modbus Gateway" width="300" />
+    <img src="https://raw.githubusercontent.com/ganehag/open-modbusgateway/master/docs/images/timmy.svg" alt="Open Modbus Gateway" width="300" />
     <br>
     <br>
     <quote>&ldquo;Open Modbus Gateway, a bridge between two worlds, connecting the security efficiency of MQTT with the simplicity of Modbus, the gateway/bridge allows for seamless communication and data flow between devices, opening up new possibilities for automation and optimization.&rdquo;</quote>
