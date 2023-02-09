@@ -253,6 +253,23 @@ config_parse_file(FILE *file, config_t *config) {
                                strncmp(value, "0", 1) == 0) {
                         config->retain = 0;
                     }
+                } else if (strncmp(name, "mqtt_protocol", 13) == 0) {
+                    if (strncmp(value, "3.1", 3) == 0) {
+                        config->mqtt_protocol_version = MQTT_PROTOCOL_V31;
+                    } else if (strncmp(value, "3.1.1", 5) == 0) {
+                        config->mqtt_protocol_version = MQTT_PROTOCOL_V311;
+                    } else if (strncmp(value, "5", 1) == 0) {
+                        config->mqtt_protocol_version = MQTT_PROTOCOL_V5;
+                    }
+                } else if (strncmp(name, "tls_version", 11) == 0) {
+                    // For openssl >= 1.0.1, the available options are tlsv1.2,
+                    // tlsv1.1 and tlsv1, with tlv1.2 being the default. For
+                    // openssl < 1.0.1, the available options are tlsv1 and
+                    // sslv3, with tlsv1 being the default.
+                    strncpy(config->tls_version,
+                            value,
+                            sizeof(config->tls_version));
+
                 } else if (strncmp(name, "clean_session", 13) == 0) {
                     if (strncmp(value, "true", 4) == 0 ||
                         strncmp(value, "1", 1) == 0) {

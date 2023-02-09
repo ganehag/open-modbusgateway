@@ -186,6 +186,20 @@ main(int argc, char *argv[]) {
         }
     }
 
+    // Default values for config
+    config.mqtt_protocol_version = MQTT_PROTOCOL_V31;
+    config.qos = 0;
+    config.retain = 0;
+    config.keepalive = 60;
+    config.port = 1883;
+    config.timeout = 10;
+    config.reconnect_delay = 5;
+    strncpy(config.host, "localhost", sizeof(config.host) - 1);
+    strncpy(config.request_topic, "request", sizeof(config.request_topic) - 1);
+    strncpy(
+        config.response_topic, "response", sizeof(config.response_topic) - 1);
+    strncpy(config.tls_version, "tlsv1", sizeof(config.tls_version) - 1);
+
     if (configfile == NULL) {
         // load config from default locations
         char *config_files[] = {"/etc/omgw/omg.conf",
@@ -253,19 +267,41 @@ main(int argc, char *argv[]) {
         mosquitto_connect_callback_set(mosq, mqtt_connect_callback);
         mosquitto_message_callback_set(mosq, mqtt_message_callback);
 
-        // Set username and password
-        if (argc == 7) {
-            if (mosquitto_username_pw_set(mosq, argv[5], argv[6]) !=
+        // Set username and password if not null in config
+        if (strlen(config.username) > 0 && strlen(config.password) > 0) {
+            if (mosquitto_username_pw_set(
+                    mosq, config.username, config.password) !=
                 MOSQ_ERR_SUCCESS) {
                 flog(logfile, "Unable to set username and password\n");
                 goto terminate;
             }
         }
 
+        // Set TLS options if not null in config
+        if (strlen(config.ca_cert_path) > 0) {
+            if (mosquitto_tls_set(mosq,
+                                  config.ca_cert_path,
+                                  NULL,
+                                  config.cert_path,
+                                  config.key_path,
+                                  NULL) != MOSQ_ERR_SUCCESS) {
+                flog(logfile, "Unable to set TLS options\n");
+                goto terminate;
+            }
+        }
+
+        // MQTT protocol version
+        mosquitto_opts_set(
+            mosq, MOSQ_OPT_PROTOCOL_VERSION, &config.mqtt_protocol_version);
+
         // Connect to the broker
         rc = mosquitto_connect(mosq, config.host, config.port, 60);
-
-        // printf("Connecting to %s:%d\n", mqtt_host, mqtt_port);
+        if (rc) {
+            flog(logfile,
+                 "Unable to connect to broker: %s\n",
+                 mosquitto_strerror(rc));
+            goto terminate;
+        }
 
         // Start the main loop
         while (run) {

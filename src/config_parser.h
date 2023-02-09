@@ -76,11 +76,17 @@ typedef struct {
     uint8_t retain;
     uint8_t clean_session;
 
+    uint16_t timeout;
+    uint16_t reconnect_delay;
+
     // tls stuff
     char ca_cert_path[256];
     char cert_path[256];
     char key_path[256];
     uint8_t verify;
+
+    int mqtt_protocol_version;
+    char tls_version[12];
 
     char request_topic[1024];
     char response_topic[1024];
