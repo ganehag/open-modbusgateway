@@ -13,11 +13,6 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
 
-    - name: Build project with Teltonika SDK Toolchain (RUT9M_R 951, 956)
-      uses: docker://ganehag/teltonika-sdk-toolchain:RUT9M_R_00.07.03.4
-      with:
-        args: bash -c "export PATH=/opt/toolchain-mipsel_24kc_gcc-8.4.0_musl/bin:$PATH; ./configure --host=mipsel-openwrt-linux-musl --prefix=`pwd`/build && make install"
-
     - name: Prepare IPK package
       run: |
         mkdir -p `pwd`/build/etc/init.d
@@ -27,6 +22,11 @@ jobs:
         cp openwrt/omg.config `pwd`/build/etc/config/omg
         chmod +x `pwd`/build/etc/init.d/omg
         echo "Architecture: mipsel_24kc" >> build/CONTROL/control
+
+    - name: Build project with Teltonika SDK Toolchain (RUT9M_R 951, 956)
+      uses: docker://ganehag/teltonika-sdk-toolchain:RUT9M_R_00.07.03.4
+      with:
+        args: bash -c "export PATH=/opt/toolchain-mipsel_24kc_gcc-8.4.0_musl/bin:$PATH; ./configure --host=mipsel-openwrt-linux-musl --prefix=`pwd`/build && make install"
 
     - name: "Build IPK package"
       uses: docker://ganehag/teltonika-sdk-toolchain:RUT9M_R_00.07.03.4
