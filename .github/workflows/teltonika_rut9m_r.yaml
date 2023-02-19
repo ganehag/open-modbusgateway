@@ -16,7 +16,7 @@ jobs:
     - name: Build project with Teltonika SDK Toolchain (RUT9M_R 951, 956)
       uses: docker://ganehag/teltonika-sdk-toolchain:RUT9M_R_00.07.03.4
       with:
-        args: bash -c "export PATH=/opt/toolchain-mipsel_24kc_gcc-8.4.0_musl/bin:$PATH; ./configure --host=mipsel-openwrt-linux-musl --prefix=`pwd`/build && make install && mkdir -p `pwd`/build/etc/init.d && mkdir -p `pwd`/build/etc/config && cp -a openwrt/CONTROL `pwd`/build && cp openwrt/omg.init `pwd`/build/etc/init.d/omg && cp openwrt/omg.config `pwd`/build/etc/config/omg && chmod +x `pwd`/build/etc/init.d/omg && ipk-build build ."
+        args: bash -c "export PATH=/opt/toolchain-mipsel_24kc_gcc-8.4.0_musl/bin:$PATH; ./configure --host=mipsel-openwrt-linux-musl --prefix=`pwd`/build && make install && mkdir -p `pwd`/build/etc/init.d && mkdir -p `pwd`/build/etc/config && cp -a openwrt/CONTROL `pwd`/build && cp openwrt/omg.init `pwd`/build/etc/init.d/omg && cp openwrt/omg.config `pwd`/build/etc/config/omg && chmod +x `pwd`/build/etc/init.d/omg && echo 'Architecture: mipsel_24kc' >> build/CONTROL/control && ipk-build build ."
 
     - name: Upload binaries to release
       uses: svenstaro/upload-release-action@v2
