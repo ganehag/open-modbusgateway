@@ -18,9 +18,12 @@ jobs:
       with:
         args: bash -c "export PATH=/opt/toolchain-mips_24kc_gcc-8.4.0_musl/bin:$PATH; ./configure --host=mips-openwrt-linux-musl --prefix=`pwd`/build && make install && mkdir -p `pwd`/build/etc/init.d && mkdir -p `pwd`/build/etc/config && cp -a openwrt/CONTROL `pwd`/build && cp openwrt/omg.init `pwd`/build/etc/init.d/omg && cp openwrt/omg.config `pwd`/build/etc/config/omg && chmod +x `pwd`/build/etc/init.d/omg && ipk-build build ."
 
-    - name: Upload files
-      uses: actions/upload-artifact@v3
+    - name: Upload binaries to release
+      uses: svenstaro/upload-release-action@v2
       with:
-        name: open-modbus-gateway for Teltonika Devices
-        path: omg_*.ipk
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        file: omg_*.ipk
+        tag: ${{ github.ref }}
+        overwrite: true
+        file_glob: true
 
