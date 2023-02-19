@@ -1,0 +1,10 @@
+Package: omg
+Version: 0.2.0
+Depends: libc, libmodbus, libmosquitto
+Source: feeds/packages/net/omg
+SourceName: open-modbus-gateway
+License: GPLv3
+Section: net
+Maintainer: Mikael Ganehag Brorsson <mikael.brorsson@gmail.com>
+Description: A MQTT to Modbus Gateway.
+Architecture: mips_24kc
