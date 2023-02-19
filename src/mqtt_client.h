@@ -10,12 +10,12 @@
 
 void mqtt_reply_error(struct mosquitto *mosq,
                       const char *topic,
-                      uint64_t cookie,
+                      unsigned long long int cookie,
                       int error,
                       const char *str_msg);
 void mqtt_reply_ok(struct mosquitto *mosq,
                    const char *topic,
-                   uint64_t cookie,
+                   unsigned long long int cookie,
                    uint32_t datalen,
                    uint16_t *data);
 void mqtt_stderr_log(int rc);

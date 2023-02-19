@@ -237,7 +237,7 @@ mqtt_logfile_log(int rc) {
 void
 mqtt_reply_error(struct mosquitto *mosq,
                  const char *topic,
-                 uint64_t cookie,
+                 unsigned long long int cookie,
                  int error,
                  const char *str_msg) {
     char error_msg[256];
@@ -245,19 +245,23 @@ mqtt_reply_error(struct mosquitto *mosq,
 
     switch (error) {
     case MQTT_INVALID_REQUEST:
-        snprintf(
-            error_msg, sizeof(error_msg), "%lu ERROR: INVALID REQUEST", cookie);
+        snprintf(error_msg,
+                 sizeof(error_msg),
+                 "%llu ERROR: INVALID REQUEST",
+                 cookie);
         break;
     case MQTT_MESSAGE_BLOCKED:
-        snprintf(
-            error_msg, sizeof(error_msg), "%lu ERROR: MESSAGE BLOCKED", cookie);
+        snprintf(error_msg,
+                 sizeof(error_msg),
+                 "%llu ERROR: MESSAGE BLOCKED",
+                 cookie);
         break;
     case MQTT_ERROR_MESSAGE:
         snprintf(
-            error_msg, sizeof(error_msg), "%lu ERROR: %s", cookie, str_msg);
+            error_msg, sizeof(error_msg), "%llu ERROR: %s", cookie, str_msg);
         break;
     default:
-        snprintf(error_msg, sizeof(error_msg), "%lu ERROR: UNKNOWN", cookie);
+        snprintf(error_msg, sizeof(error_msg), "%llu ERROR: UNKNOWN", cookie);
         break;
     }
 
@@ -269,7 +273,7 @@ mqtt_reply_error(struct mosquitto *mosq,
 void
 mqtt_reply_ok(struct mosquitto *mosq,
               const char *topic,
-              uint64_t cookie,
+              unsigned long long int cookie,
               uint32_t datalen,
               uint16_t *data) {
     char msg[1024];
@@ -277,10 +281,10 @@ mqtt_reply_ok(struct mosquitto *mosq,
 
     if (datalen > 0) {
         char *data_str = join_regs_str(datalen, data, " ");
-        snprintf(msg, sizeof(msg), "%lu OK %s", cookie, data_str);
+        snprintf(msg, sizeof(msg), "%llu OK %s", cookie, data_str);
         free(data_str);
     } else {
-        snprintf(msg, sizeof(msg), "%lu OK", cookie);
+        snprintf(msg, sizeof(msg), "%llu OK", cookie);
     }
 
     int rc = mosquitto_publish(mosq, NULL, topic, strlen(msg), msg, 1, false);
