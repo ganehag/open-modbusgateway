@@ -16,7 +16,22 @@ jobs:
     - name: Build project with Teltonika SDK Toolchain (RUT9_R 900, 905, 950, 955)
       uses: docker://ganehag/teltonika-sdk-toolchain:RUT9_R_00.07.03.4
       with:
-        args: bash -c "export PATH=/opt/toolchain-mips_24kc_gcc-8.4.0_musl/bin:$PATH; ./configure --host=mips-openwrt-linux-musl --prefix=`pwd`/build && make install && mkdir -p `pwd`/build/etc/init.d && mkdir -p `pwd`/build/etc/config && cp -a openwrt/CONTROL `pwd`/build && cp openwrt/omg.init `pwd`/build/etc/init.d/omg && cp openwrt/omg.config `pwd`/build/etc/config/omg && chmod +x `pwd`/build/etc/init.d/omg && echo 'Architecture: mips_24kc' >> build/CONTROL/control && ipk-build build ."
+        args: bash -c "export PATH=/opt/toolchain-mips_24kc_gcc-8.4.0_musl/bin:$PATH; ./configure --host=mips-openwrt-linux-musl --prefix=`pwd`/build && make install"
+
+    - name: Prepare IPK package
+      run: |
+        mkdir -p `pwd`/build/etc/init.d
+        mkdir -p `pwd`/build/etc/config
+        cp -a openwrt/CONTROL `pwd`/build
+        cp openwrt/omg.init `pwd`/build/etc/init.d/omg
+        cp openwrt/omg.config `pwd`/build/etc/config/omg
+        chmod +x `pwd`/build/etc/init.d/omg
+        echo "Architecture: mips_24kc" >> build/CONTROL/control
+
+    - name: "Build IPK package"
+      uses: docker://ganehag/teltonika-sdk-toolchain:RUT9_R_00.07.03.4
+      with:
+        args: ipk-build build .
 
     - name: Upload binaries to release
       uses: svenstaro/upload-release-action@v2
@@ -26,4 +41,3 @@ jobs:
         tag: ${{ github.ref }}
         overwrite: true
         file_glob: true
-
