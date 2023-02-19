@@ -1,6 +1,18 @@
 AC_INIT([modbusgateway], [0.1], [mikael.brorsson@gmail.com])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign subdir-objects])
 
+COMPILER_FLAGS
+
+AC_LANG_C
+
+AC_ARG_ENABLE([debug], [AS_HELP_STRING([--enable-debug],
+                 [enable debug mode])],
+                 [enable_debug=$enableval], [enable_debug=no])
+
+if test "x$enable_debug" = "xyes"; then
+  CFLAGS="$CFLAGS -g -DDEBUG"
+fi
+
 # Check for programs
 AC_PROG_CC
 PKG_PROG_PKG_CONFIG

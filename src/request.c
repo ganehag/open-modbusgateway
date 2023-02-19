@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "log.h"
 #include "mqtt_client.h"
 #include "request.h"
 
@@ -66,6 +67,25 @@ void *
 handle_request(void *arg) {
     modbus_t *ctx;
     request_t *req = (request_t *)arg;
+
+    // debug print request after cast
+
+#ifdef DEBUG
+    flog(logfile, "void *handle_request(void *arg)\n");
+    flog(logfile,
+         "1: %hhu 2:%llu 3:%hhu 4:%s 5:%s 6:%hu 7:%hhu 8:%hhu 9:%u 10:%hu\n",
+         req->format,        // %d
+         req->cookie,        // %llu
+         req->ip_type,       // %d (Will be managed by modbus_new_tcp_pi)
+         req->ip,            // %s
+         req->port,          // %s (Yes, as string)
+         req->timeout,       // %d
+         req->slave_id,      // %d
+         req->function,      // %d
+         req->register_addr, // %d (is register number in request format)
+         req->register_count // %d (is the value if function is 6)
+    );
+#endif
 
     // Detach from the parent thread (join not required)
     pthread_detach(pthread_self());
@@ -242,6 +262,7 @@ handle_request(void *arg) {
         }
 
 #ifdef DEBUG
+
         if (req->function >= 1 && req->function <= 4) {
             for (int i = 0; i < req->register_count; i++) {
                 fprintf(logfile,
