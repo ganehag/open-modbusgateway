@@ -8,7 +8,7 @@
 ---
 
 
-# Open Modbus Gateway
+# Open MQTT to Modbus Gateway
 
 This software is an Open Source alternative to Teltonikas' Modbus Gateway (`modbusgateway`).
 
