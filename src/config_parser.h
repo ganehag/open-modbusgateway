@@ -19,6 +19,7 @@
 #define CONFIG_PARSER_ERROR_INVALID_SLAVE_ID -5
 #define CONFIG_PARSER_ERROR_INVALID_FUNCTION_CODE -6
 #define CONFIG_PARSER_ERROR_INVALID_REGISTER_ADDRESS -7
+#define CONFIG_PARSER_ERROR_INVALID_TLS_VERSION -8
 
 // error codes unique to parse_option_range()
 #define PARSE_OPTION_RANGE_OK 0
@@ -83,7 +84,7 @@ typedef struct {
     char ca_cert_path[256];
     char cert_path[256];
     char key_path[256];
-    uint8_t verify;
+    uint8_t verify_ca_cert;
 
     int mqtt_protocol_version;
     char tls_version[12];

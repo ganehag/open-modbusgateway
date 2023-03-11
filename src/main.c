@@ -187,18 +187,20 @@ main(int argc, char *argv[]) {
     }
 
     // Default values for config
-    config.mqtt_protocol_version = MQTT_PROTOCOL_V31;
+    config.mqtt_protocol_version = MQTT_PROTOCOL_V311;
     config.qos = 0;
     config.retain = 0;
     config.keepalive = 60;
     config.port = 1883;
     config.timeout = 10;
     config.reconnect_delay = 5;
+    config.verify_ca_cert = 1; // verify server certificate
     strncpy(config.host, "localhost", sizeof(config.host) - 1);
     strncpy(config.request_topic, "request", sizeof(config.request_topic) - 1);
     strncpy(
         config.response_topic, "response", sizeof(config.response_topic) - 1);
-    strncpy(config.tls_version, "tlsv1", sizeof(config.tls_version) - 1);
+    strncpy(config.tls_version, "tlsv1.1", sizeof(config.tls_version) - 1);
+    sprintf(config.client_id, "omg_client_%d", getpid());
 
     if (configfile == NULL) {
         // load config from default locations
@@ -279,14 +281,44 @@ main(int argc, char *argv[]) {
 
         // Set TLS options if not null in config
         if (strlen(config.ca_cert_path) > 0) {
-            if (mosquitto_tls_set(mosq,
-                                  config.ca_cert_path,
-                                  NULL,
-                                  config.cert_path,
-                                  config.key_path,
-                                  NULL) != MOSQ_ERR_SUCCESS) {
+            char *ca_cert = config.ca_cert_path;
+            char *cert = NULL;
+            char *key = NULL;
+
+            // Check if cert and key are provided
+            if (strlen(config.cert_path) > 0 || strlen(config.key_path) > 0) {
+                if (strlen(config.cert_path) > 0 &&
+                    strlen(config.key_path) > 0) {
+                    cert = config.cert_path;
+                    key = config.key_path;
+                } else {
+                    flog(logfile,
+                         "Unable to set TLS options: cert and key must be "
+                         "provided together\n");
+                    goto terminate;
+                }
+            }
+
+            int ret = mosquitto_tls_set(mosq, ca_cert, NULL, cert, key, NULL);
+            if (ret != MOSQ_ERR_SUCCESS) {
                 flog(logfile, "Unable to set TLS options\n");
                 goto terminate;
+            }
+
+            // Set TLS version
+            if (strlen(config.tls_version) > 0) {
+                if (mosquitto_tls_opts_set(mosq, 1, config.tls_version, NULL) !=
+                    MOSQ_ERR_SUCCESS) {
+                    flog(logfile, "Unable to set TLS version\n");
+                    goto terminate;
+                }
+            }
+
+            // Verify the broker certificate
+            if (config.verify_ca_cert) {
+                mosquitto_tls_insecure_set(mosq, false);
+            } else {
+                mosquitto_tls_insecure_set(mosq, true);
             }
         }
 

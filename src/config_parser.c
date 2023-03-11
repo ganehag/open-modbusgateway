@@ -118,18 +118,7 @@ config_parse_file(FILE *file, config_t *config) {
     int line_number = -1; // -1 because of the first line, which will increment
                           // line_number to 0
 
-    // zero out the config struct
-    memset(config, 0, sizeof(config_t));
-
-    // set some default values
-    config->port = 1883;
-    config->keepalive = 60;
-    config->qos = 1;
-    config->retain = 0;
-    // config->timeout = 10;
-    // config->reconnect_delay = 5;
-
-    sprintf(config->client_id, "omg_client_%d", getpid());
+    // default values should have been set before calling this function
 
     // read a line from the config file
     while (fgets(line, MAX_LINE_LEN, file) != NULL) {
@@ -266,6 +255,14 @@ config_parse_file(FILE *file, config_t *config) {
                     // tlsv1.1 and tlsv1, with tlv1.2 being the default. For
                     // openssl < 1.0.1, the available options are tlsv1 and
                     // sslv3, with tlsv1 being the default.
+
+                    if (strncmp(value, "tlsv1.2", 7) != 0 &&
+                        strncmp(value, "tlsv1.1", 7) != 0 &&
+                        strncmp(value, "tlsv1", 5) != 0) {
+                        // skip sslv3
+                        return CONFIG_PARSER_ERROR_INVALID_TLS_VERSION;
+                    }
+
                     strncpy(config->tls_version,
                             value,
                             sizeof(config->tls_version));
@@ -278,27 +275,27 @@ config_parse_file(FILE *file, config_t *config) {
                                strncmp(value, "0", 1) == 0) {
                         config->clean_session = 0;
                     }
-                } else if (strncmp(name, "ca_cert", 7) == 0) {
+                } else if (strncmp(name, "ca_cert_path", 12) == 0) {
                     // server certificate
                     strncpy(config->ca_cert_path,
                             value,
                             sizeof(config->ca_cert_path));
-                } else if (strncmp(name, "cert", 4) == 0) {
+                } else if (strncmp(name, "cert_path", 9) == 0) {
                     // client certificate
                     strncpy(
                         config->cert_path, value, sizeof(config->cert_path));
-                } else if (strncmp(name, "key", 3) == 0) {
+                } else if (strncmp(name, "key_path", 8) == 0) {
                     // client key
                     strncpy(config->key_path, value, sizeof(config->key_path));
-                } else if (strncmp(name, "verify", 6) == 0) {
+                } else if (strncmp(name, "verify_ca_cert", 14) == 0) {
                     // verify the server certificate
                     // should not be used in production
                     if (strncmp(value, "true", 4) == 0 ||
                         strncmp(value, "1", 1) == 0) {
-                        config->verify = 1;
+                        config->verify_ca_cert = 1;
                     } else if (strncmp(value, "false", 5) == 0 ||
                                strncmp(value, "0", 1) == 0) {
-                        config->verify = 0;
+                        config->verify_ca_cert = 0;
                     }
                 } else if (strncmp(name, "request_topic", 13) == 0) {
                     strncpy(config->request_topic,
