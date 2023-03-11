@@ -93,10 +93,9 @@ Modbus is a protocol that is not secure by default. There is no authentication o
 
 This software uses MQTT to relay messages to a Modbus TCP slave from the internet. MQTT is capable of being a secure protocol, but only if the MQTT broker and client both support TLS encryption.
 
-TLS encryption is supported and tested against the [test.mosquitto.org](https://test.mosquitto.org/) broker on port 8884. At the moment however, there is no configuration support for anything other than declaring the certificate files to be used. It is thus not possible to specify the TLS version, etc.
+TLS encryption is supported and tested against the [test.mosquitto.org](https://test.mosquitto.org/) broker on port 8884.
 
-
-Still, one shouldn't just trust any message sent to the gateway. Otherwise, the gateway would blindly relay the message to the Modbus TCP slave. Even a simple misspelling of a register number could cause damage to the Modbus TCP slave.
+Still, even with encryption, one shouldn't just trust any message sent to the gateway. Otherwise, the gateway would blindly relay the message to the Modbus TCP slave. Even a simple misspelling of a register number could cause damage to the Modbus TCP slave.
 
 To get around this, the gateway has built-in checks to filter out messages. A message must pass the following checks to be relayed to the Modbus TCP slave:
 
