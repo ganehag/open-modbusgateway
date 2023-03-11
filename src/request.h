@@ -29,6 +29,8 @@ typedef struct {
 #define IP_TYPE_IPV6 1
 #define IP_TYPE_HOSTNAME 2
 
+#define MAX_REQUEST_THREADS 20 // TODO: Make this configurable
+
 char *
 join_regs_str(const uint16_t datalen, const uint16_t *data, const char *sep);
 

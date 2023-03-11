@@ -28,6 +28,9 @@
 #include "mqtt_client.h"
 #include "request.h"
 
+uint16_t request_count = 0;
+pthread_mutex_t request_count_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 char *
 join_regs_str(const uint16_t datalen, const uint16_t *data, const char *sep) {
     char *joined = NULL;
@@ -67,6 +70,12 @@ void *
 handle_request(void *arg) {
     modbus_t *ctx;
     request_t *req = (request_t *)arg;
+    uint16_t req_count;
+
+    pthread_mutex_lock(&request_count_mutex);
+    request_count++;
+    req_count = request_count;
+    pthread_mutex_unlock(&request_count_mutex);
 
     // debug print request after cast
 
@@ -89,6 +98,15 @@ handle_request(void *arg) {
 
     // Detach from the parent thread (join not required)
     pthread_detach(pthread_self());
+
+    if (req_count > MAX_REQUEST_THREADS) {
+        mqtt_reply_error(req->mosq,
+                         req->response_topic,
+                         req->cookie,
+                         MQTT_ERROR_MESSAGE,
+                         "Too many requests");
+        goto pthread_exit;
+    }
 
     // IPv4 & IPv6 support
     ctx = modbus_new_tcp_pi(req->ip, req->port);
@@ -285,6 +303,11 @@ modbus_cleanup:
     free(req);
 
 pthread_exit:
+
+    // decrement the number of concurrent threads
+    pthread_mutex_lock(&request_count_mutex);
+    request_count--;
+    pthread_mutex_unlock(&request_count_mutex);
 
     pthread_exit(NULL);
 }
