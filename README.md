@@ -14,18 +14,28 @@ This software is an Open Source alternative to Teltonikas' Modbus Gateway (`modb
 
 It is written in C and uses the [libmodbus](https://libmodbus.org/) library. It also depends on the [libmosquitto](https://mosquitto.org/) library for MQTT communication.
 
-This software used to be a drop in replacement for the Teltonika Modbus Gateway software, but it has since been rewritten and is no longer compatible. It comes with a new configuration file format and supports a lot more features.
+This software used to be a drop-in replacement for the Teltonika Modbus Gateway software, but it has since been rewritten and is no longer compatible.
 
-> **NOTE:** This software is in no way affiliated with Teltonika.
+> **NOTE:** This software is not affiliated with Teltonika, and I've not seen a single line of Teltonika code.
 
 
 # Background
 
 The Teltonika RUT's `modbusgateway` software is a crucial component of the product offering at my company.
 
-Despite the original software having limitations, such as not being able to read from discrete inputs or write or read coils, I was determined to find a solution. However, due to our limited resources and time, replacing the software entirely was not an option.
+I don't know why Teltonika developed it in the first place, the requirements, or the design decisions behind it. All I know is that it doesn't (at the time of writing) support all typical Modbus functions. I raised this problem with them in February 2021, but it is still unresolved.
 
-I took matters into my own hands and, in my spare time, created an open-source version that addresses these limitations and is specifically tailored to our needs.
+Instead of waiting for a fix, I created my own software to fill the gap.
+
+
+# Benefits over the original software
+
+At first, it was nothing more than a drop-in replacement for the original software, with support for the missing Modbus functions. However, with time I realised that some security layer was required to prevent unwanted commands to Modbus slaves. Along with that came the need for a rules engine to filter out unwanted requests. While I was at it, I also added support for TLS so that the software no longer needs to rely on a separate MQTT broker.
+
+* Supports all Modbus functions
+* Is open source
+* Supports TLS without the need for a separate MQTT broker
+* Rules engine for advanced filtering of requests
 
 
 # Protocol
@@ -81,7 +91,10 @@ A `controller` publishes a message in the format below on a `request` topic. The
 
 Modbus is a protocol that is not secure by default. There is no authentication or encryption in the Modbus protocol.
 
-This software uses MQTT to relay messages to a Modbus TCP slave from the internet. MQTT is a secure protocol, but it is up to the user to ensure that the MQTT broker is secure. At the moment, this gateway does not support TLS encryption. It only supports plain MQTT with username and password authentication. I will rectify this sometime in the future. In the meantime, using a secure MQTT broker is recommended as a stepping stone to the internet.
+This software uses MQTT to relay messages to a Modbus TCP slave from the internet. MQTT is capable of being a secure protocol, but only if the MQTT broker and client both support TLS encryption.
+
+TLS encryption is supported and tested against the [test.mosquitto.org](https://test.mosquitto.org/) broker on port 8884. At the moment however, there is no configuration support for anything other than declaring the certificate files to be used. It is thus not possible to specify the TLS version, etc.
+
 
 Still, one shouldn't just trust any message sent to the gateway. Otherwise, the gateway would blindly relay the message to the Modbus TCP slave. Even a simple misspelling of a register number could cause damage to the Modbus TCP slave.
 
@@ -139,6 +152,25 @@ config rule
 ```
 
 ## Sections
+
+- `mqtt`: This section contains the settings for the MQTT connection. It has the following options:
+  - `host`: The hostname or IP address of the MQTT broker.
+  - `port`: The port number of the MQTT broker.
+  - `keepalive`: The keepalive interval in seconds.
+  - `username`: The username for the MQTT broker.
+  - `password`: The password for the MQTT broker.
+  - `client_id`: The client ID for the MQTT connection.
+  - `qos`: The quality of service for the MQTT connection. Must be either 0, 1 or 2.
+  - `retain`: Whether to retain the MQTT messages. Must be either true or false.
+  - `mqtt_protocol`: The MQTT protocol version to use. Must be either 3.1, 3.1.1, or 5.
+  - `tls_version`: The TLS version to use. For OpenSSL >= 1.0.1, the available options are tlsv1.2, tlsv1.1, and tlsv1, with tlsv1.2 being the default. For OpenSSL < 1.0.1, the available options are tlsv1 and sslv3, with tlsv1 being the default.
+  - `clean_session`: Whether to use a clean session for the MQTT connection. Must be either true or false.
+  - `ca_cert_path`: The path to the CA certificate file. If this option is not specified, the CA certificate will not be used.
+  - `cert_path`: The path to the certificate file. If this option is not specified, the certificate will not be used.
+  - `key_path`: The path to the key file. If this option is not specified, the key will not be used.
+  - `verify`: Whether to verify the server certificate. Should not be used in production.
+  - `request_topic`: The topic used for receiving requests.
+  - `response_topic`: The topic used to send responses.
 
 - `mqtt`: This section contains the settings for the MQTT connection. It has the following options:
   - `host`: The hostname or IP address of the MQTT broker.
