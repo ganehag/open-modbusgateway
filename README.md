@@ -19,7 +19,7 @@ This software used to be a drop-in replacement for the Teltonika Modbus Gateway 
 > **NOTE:** This software is not affiliated with Teltonika, and I've not seen a single line of Teltonika code.
 
 
-# Background
+## Background
 
 The Teltonika RUT's `modbusgateway` software is a crucial component of the product offering at my company.
 
@@ -28,7 +28,7 @@ I don't know why Teltonika developed it in the first place, the requirements, or
 Instead of waiting for a fix, I created my own software to fill the gap.
 
 
-# Benefits over the original software
+## Benefits over the original software
 
 At first, it was nothing more than a drop-in replacement for the original software, with support for the missing Modbus functions. However, with time I realised that some security layer was required to prevent unwanted commands to Modbus slaves. Along with that came the need for a rules engine to filter out unwanted requests. While I was at it, I also added support for TLS so that the software no longer needs to rely on a separate MQTT broker.
 
@@ -38,11 +38,11 @@ At first, it was nothing more than a drop-in replacement for the original softwa
 * Rules engine for advanced filtering of requests
 
 
-# Protocol
+## Protocol
 
 A `controller` publishes a message in the format below on a `request` topic. The software interprets the message and performs a Modbus request based on instructions from the message. The software then replies on the `response` topic.
 
-## Request message
+### Request message
 
 `0 <COOKIE> <IP_TYPE> <IP> <PORT> <TIMEOUT> <SLAVE_ID> <MODBUS_FUNCTION> <REGISTER_NUMBER> <REGISTER_COUNT/VALUE> <DATA>`
 
@@ -61,7 +61,7 @@ A `controller` publishes a message in the format below on a `request` topic. The
 | DATA                 | series of coil/register values             | This field only exists for Modbus functions 15 (coil) and 16 (register). A series of coil/register values separated with commas, without spaces (e.g., 0,1,1,0,0,1 or 1,2,3,654,21,789). There must be exactly as many values as specified in register count. Each coil value must be in the range of [0..1]. Each register value must be in the range of [0..65535]. |
 
 
-## Response message
+### Response message
 
 `<COOKIE> OK`
 
@@ -77,7 +77,7 @@ A `controller` publishes a message in the format below on a `request` topic. The
 | Error    |                         | For failures, the response will be "&lt;COOKIE&gt; ERROR: &lt;message&gt;" where &lt;message&gt; is the error description.                                                 |
 
 
-# Examples
+## Examples
 
 
 | Action                                  | Request                                               | Response                            |
@@ -87,7 +87,7 @@ A `controller` publishes a message in the format below on a `request` topic. The
 | Sending too few holding register values | 0 565842596387 0 10.0.0.126 5020 5 1 16 1 3 1234,5678 | 565842596387 ERROR: INVALID REQUEST |
 
 
-# Security
+## Security
 
 Modbus is a protocol that is not secure by default. There is no authentication or encryption in the Modbus protocol.
 
@@ -109,11 +109,11 @@ To get around this, the gateway has built-in checks to filter out messages. A me
 The checks are configurable via the configuration file. The configuration file is described in the next section.
 
 
-# Configuration
+## Configuration
 
 The config file is used to specify the settings for the application. The file must be in plain text format.
 
-## Format
+### Format
 
 The file is divided into sections, each section starts with a `config` keyword followed by the name of the section.
 Each section contains multiple options, each option is specified on a new line and starts with the `option` keyword followed by the name of the option and its value.
@@ -151,7 +151,7 @@ config rule
 	option register_address '0-65535'
 ```
 
-## Sections
+### Sections
 
 - `mqtt`: This section contains the settings for the MQTT connection. It has the following options:
   - `host`: The hostname or IP address of the MQTT broker.
@@ -193,4 +193,3 @@ config rule
   - `slave_id`: The slave ID of the Modbus device.
   - `function`: The function code used for the Modbus communication.
   - `register_address`: The range of register addresses used for the Modbus communication, it should be in the form of 'start-end'.
-
