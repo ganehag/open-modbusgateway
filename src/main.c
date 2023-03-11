@@ -1,5 +1,5 @@
 /*
- * This file is part of Open Modbus Gateway (omg)
+ * This file is part of Open MQTT Modbus Gateway (ommg)
  * https://github.com/ganehag/open-modbusgateway.
  *
  * Copyright (c) 2023 Mikael Ganehag Brorsson.
@@ -255,7 +255,7 @@ main(int argc, char *argv[]) {
         flog_filter(logfile, filter_list);
     }
 
-    flog(logfile, "starting Open Modbus Gateway\n");
+    flog(logfile, "starting Open MQTT Modbus Gateway\n");
 
     // Initialize the mosquitto library
     mosquitto_lib_init();
