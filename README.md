@@ -126,6 +126,9 @@ config mqtt
 	option clean_session 'true'
 	option request_topic 'request'
 	option response_topic 'response'
+	option ca_cert_path 'cert/ca.crt'
+	option cert_path 'cert/client.crt'
+	option key_path 'cert/client.key'
 
 config rule
 	option ip '::ffff:127.0.0.1/128'
@@ -148,6 +151,9 @@ config rule
   - `clean_session`: Whether to use a clean session for the MQTT connection. Must be either `true` or `false`.
   - `request_topic`: The topic used for receiving requests.
   - `response_topic`: The topic used to send responses.
+  - `ca_cert_path`: The path to the CA certificate file. If this option is not specified, the CA certificate will not be used.
+  - `cert_path`: The path to the certificate file. If this option is not specified, the certificate will not be used.
+  - `key_path`: The path to the key file. If this option is not specified, the key will not be used.
 
 - `rule`: This section contains the settings for the Modbus communication filtering. It can appear multiple times in the config file. Each section has the following options:
   - `ip`: The IP address of the Modbus device, it must be an IPv6 address or an IPv4 address encoded in IPv6 format, and it must also include a subnet mask.
