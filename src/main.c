@@ -42,12 +42,12 @@ static int run = 1;
 
 char clientid[24];
 
-const char logfile_path[] = "/var/log/omg.log";
-const char pidfile_path[] = "/var/run/omg.pid";
+const char logfile_path[] = "/var/log/ommg.log";
+const char pidfile_path[] = "/var/run/ommg.pid";
 
 void
 usage() {
-    fprintf(logfile, "Usage:\n\tomg -c <configfile> [-D] [-d] [-v] [-h]\n");
+    fprintf(logfile, "Usage:\n\tommg -c <configfile> [-D] [-d] [-v] [-h]\n");
     fprintf(logfile, "Options:\n");
     fprintf(logfile, "\t-c <configfile>\t\tPath to configuration file.\n");
     fprintf(logfile, "\t-D\t\t\tRun as daemon.\n");
@@ -151,7 +151,7 @@ main(int argc, char *argv[]) {
     struct mosquitto *mosq;
 
     memset(clientid, 0, sizeof(clientid));
-    snprintf(clientid, sizeof(clientid) - 1, "omg_%d", getpid());
+    snprintf(clientid, sizeof(clientid) - 1, "ommg_%d", getpid());
 
     // Handle signals
     signal(SIGINT, handle_signal);
@@ -200,13 +200,13 @@ main(int argc, char *argv[]) {
     strncpy(
         config.response_topic, "response", sizeof(config.response_topic) - 1);
     strncpy(config.tls_version, "tlsv1.1", sizeof(config.tls_version) - 1);
-    sprintf(config.client_id, "omg_client_%d", getpid());
+    sprintf(config.client_id, "ommg_client_%d", getpid());
 
     if (configfile == NULL) {
         // load config from default locations
-        char *config_files[] = {"/etc/omgw/omg.conf",
-                                "/etc/omgw/settings.conf",
-                                "./omg.conf",
+        char *config_files[] = {"/etc/ommg/ommg.conf",
+                                "/etc/ommg/settings.conf",
+                                "./ommg.conf",
                                 NULL};
 
         int i = 0;
