@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=open-modbusgateway
-PKG_VERSION:=0.1.3
+PKG_VERSION:=0.2.1
 PKG_RELEASE:=1
 PKG_LICENSE:=GPLv3
 PKG_LICENSE_FILES:=LICENSE
@@ -29,11 +29,10 @@ endef
 define Package/open-modbusgateway/install
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_DIR) $(1)/etc/init.d
-	$(INSTALL_DIR) $(1)/usr/sbin
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/openwrt/modbusgateway.conf $(1)/etc/config/modbusgateway
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/openwrt/modbusgateway.init $(1)/etc/init.d/modbusgateway
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/src/modbusgateway $(1)/usr/sbin/modbusgateway
+	$(INSTALL_DIR) $(1)/usr/bin
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/openwrt/openmmg.config $(1)/etc/config/openmmg
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/openwrt/openmmg.init $(1)/etc/init.d/openmmg
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/src/openmmg $(1)/usr/bin/openmmg
 endef
 
 $(eval $(call BuildPackage,open-modbusgateway))
-

@@ -1,7 +1,7 @@
-Package: omg
-Version: 0.2.0
+Package: openmmg
+Version: 0.2.1
 Depends: libc, libmodbus, libmosquitto
-Source: feeds/packages/net/omg
+Source: feeds/packages/net/openmmg
 SourceName: open-modbus-gateway
 License: GPLv3
 Section: net
