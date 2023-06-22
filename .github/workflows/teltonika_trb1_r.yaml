@@ -18,9 +18,9 @@ jobs:
         mkdir -p `pwd`/build/etc/init.d
         mkdir -p `pwd`/build/etc/config
         cp -a openwrt/CONTROL `pwd`/build
-        cp openwrt/omg.init `pwd`/build/etc/init.d/omg
-        cp openwrt/omg.config `pwd`/build/etc/config/omg
-        chmod +x `pwd`/build/etc/init.d/omg
+        cp openwrt/openmmg.init `pwd`/build/etc/init.d/openmmg
+        cp openwrt/openmmg.config `pwd`/build/etc/config/openmmg
+        chmod +x `pwd`/build/etc/init.d/openmmg
         echo "Architecture: arm_cortex-a7_neon-vfpv4" >> build/CONTROL/control
 
     - name: Build project with Teltonika SDK Toolchain (TRB140, TRB141, TRB142, TRB143, TRB145)
@@ -37,7 +37,7 @@ jobs:
       uses: svenstaro/upload-release-action@v2
       with:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
-        file: omg_*.ipk
+        file: openmmg_*.ipk
         tag: ${{ github.ref }}
         overwrite: true
         file_glob: true
