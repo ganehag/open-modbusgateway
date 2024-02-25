@@ -215,7 +215,7 @@ For detailed instructions on building a single package for OpenWRT, refer to the
    ```
 
 4. **Configure the Build System**  
-   Run `make menuconfig`, navigate to `Network`, and select the open-modbusgateway package with `[*]`.
+   Run `make menuconfig`, navigate to `Network`, and select the open-modbusgateway package with `[M]`.
 
 5. **Customize Build Options**  
    Adjust any other settings, such as ARCH and toolchain options.
@@ -230,6 +230,4 @@ For detailed instructions on building a single package for OpenWRT, refer to the
    ```
    make package/open-modbusgateway/compile V=s
    ```
-   The output will be located as specified in the build documentation.
-
-   Follow these steps to compile and integrate the open-modbusgateway into your OpenWRT build. For further customization and advanced options, see the OpenWRT developer documentation.
+   The output will be located in a subfolder of the `bin/` directory, such as; `bin/packages/i386_pentium4/base/`.
