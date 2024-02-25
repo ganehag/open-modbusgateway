@@ -192,3 +192,44 @@ config rule
   - `slave_id`: The slave ID of the Modbus device.
   - `function`: The function code used for the Modbus communication.
   - `register_address`: The range of register addresses used for the Modbus communication, it should be in the form of 'start-end'.
+
+## Building the package with OpenWRT
+
+For detailed instructions on building a single package for OpenWRT, refer to the [OpenWRT documentation](https://openwrt.org/docs/guide-developer/toolchain/single.package).
+
+### Quick Start Guide
+
+1. **Download and Extract OpenWRT**  
+   Start by downloading and extracting the OpenWRT [source code](https://github.com/openwrt/openwrt/releases).
+
+2. **Update and Install Feeds**  
+   ```
+   ./scripts/feeds update -a
+   ./scripts/feeds install -a
+   ```
+
+3. **Integrate open-modbusgateway**  
+   Copy the contents from the `openwrt` subfolder in the open-modbusgateway repository into the `package/utils/open-modbusgateway` directory.
+   ```
+   cp -a openwrt /path/to/openwrt-source/package/utils/open-modbusgateway
+   ```
+
+4. **Configure the Build System**  
+   Run `make menuconfig`, navigate to `Network`, and select the open-modbusgateway package with `[*]`.
+
+5. **Customize Build Options**  
+   Adjust any other settings, such as ARCH and toolchain options.
+
+6. **Build Tools and Toolchain**  
+   ```
+   make tools/install
+   make toolchain/install
+   ```
+
+7. **Compile the Package**  
+   ```
+   make package/open-modbusgateway/compile V=s
+   ```
+   The output will be located as specified in the build documentation.
+
+   Follow these steps to compile and integrate the open-modbusgateway into your OpenWRT build. For further customization and advanced options, see the OpenWRT developer documentation.
