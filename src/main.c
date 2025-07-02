@@ -40,8 +40,6 @@
 
 static int run = 1;
 
-char clientid[24];
-
 const char logfile_path[] = "/var/log/openmmg.log";
 const char pidfile_path[] = "/var/run/openmmg.pid";
 
@@ -149,9 +147,6 @@ main(int argc, char *argv[]) {
 
     int rc = 0;
     struct mosquitto *mosq;
-
-    memset(clientid, 0, sizeof(clientid));
-    snprintf(clientid, sizeof(clientid) - 1, "openmmg_%d", getpid());
 
     // Handle signals
     signal(SIGINT, handle_signal);
@@ -261,7 +256,7 @@ main(int argc, char *argv[]) {
     mosquitto_lib_init();
 
     // Create a new mosquitto client instance
-    mosq = mosquitto_new(clientid, true, &config);
+    mosq = mosquitto_new(config.client_id, true, &config);
     if (mosq) {
         mosquitto_threaded_set(mosq, 1); // Enable threading
 
