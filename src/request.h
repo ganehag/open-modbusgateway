@@ -1,7 +1,6 @@
 #ifndef REQUEST_H
 #define REQUEST_H
 
-#include <ctype.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -21,6 +20,12 @@ typedef struct {
     uint32_t register_addr;
     uint16_t register_count;
     uint16_t data[123];
+    char serial_device[128];
+    int serial_baud;
+    char serial_parity;
+    int serial_data_bits;
+    int serial_stop_bits;
+    char serial_id[64];
 
     char response_topic[1024];
 } request_t;
@@ -30,6 +35,10 @@ typedef struct {
 #define IP_TYPE_HOSTNAME 2
 
 #define MAX_REQUEST_THREADS 20 // TODO: Make this configurable
+#define RTU_DEFAULT_BAUD 9600
+#define RTU_DEFAULT_PARITY 'N'
+#define RTU_DEFAULT_DATA_BITS 8
+#define RTU_DEFAULT_STOP_BITS 1
 
 char *
 join_regs_str(const uint16_t datalen, const uint16_t *data, const char *sep);

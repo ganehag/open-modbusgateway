@@ -20,6 +20,7 @@
 #define CONFIG_PARSER_ERROR_INVALID_FUNCTION_CODE -6
 #define CONFIG_PARSER_ERROR_INVALID_REGISTER_ADDRESS -7
 #define CONFIG_PARSER_ERROR_INVALID_TLS_VERSION -8
+#define CONFIG_PARSER_ERROR_INVALID_SERIAL_GATEWAY -10
 
 // error codes unique to parse_option_range()
 #define PARSE_OPTION_RANGE_OK 0
@@ -47,6 +48,19 @@ typedef struct {
     uint8_t min;
     uint8_t max;
 } range_u8_t;
+
+typedef struct serial_gateway {
+    char id[64];
+    char device[128];
+    char ip[INET6_ADDRSTRLEN];
+    uint16_t port;
+    int baudrate;
+    char parity;
+    int data_bits;
+    int stop_bits;
+    uint8_t slave_id;
+    struct serial_gateway *next;
+} serial_gateway_t;
 
 typedef struct {
     char ip[INET6_ADDRSTRLEN + 4]; // Ip address, with a CIDR prefix
@@ -94,6 +108,7 @@ typedef struct {
 
     // filter
     filter_t *head;
+    serial_gateway_t *serial_head;
 } config_t;
 
 char *trim_token(char *str, char trim_char, size_t len);
@@ -108,11 +123,15 @@ int config_parse_file(FILE *file, config_t *config);
 int parse_option_range(char *option_value, range_u32_t *list);
 
 void handle_filter_row(config_t *config, rule_t *rule);
+int handle_serial_gateway_row(config_t *config, serial_gateway_t *gateway);
 
 int validate_config(config_t *config);
 
 int is_valid_hostname(const char *hostname);
 int is_valid_ipv4(const char *ip);
 int is_valid_ipv6(const char *ip);
+
+serial_gateway_t *serial_gateway_find(serial_gateway_t *head, const char *id);
+void serial_gateway_free(serial_gateway_t **head);
 
 #endif

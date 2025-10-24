@@ -4,6 +4,15 @@ config mqtt
 	option request_topic 'request'
 	option response_topic 'response'
 
+config serial_gateway
+	option id 'ttyusb0'
+	option device '/dev/ttyUSB0'
+	option baudrate '9600'
+	option parity 'none'
+	option data_bits '8'
+	option stop_bits '1'
+	option slave_id '2'
+
 config rule
 	option ip '::ffff:127.0.0.1/128'
 	option port '1502'

@@ -17,6 +17,7 @@ void test_multiple_filters_match(void);
 void test_clear_filters(void);
 
 void test_config_parse_single_rule(void);
+void test_config_parse_serial_gateway(void);
 
 void test_config_parse_file(void);
 void test_parse_option_range_ok(void);

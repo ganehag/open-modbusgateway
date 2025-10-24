@@ -29,6 +29,7 @@ int main() {
     // CU_add_test(suite3, "test_parse_option_range_errors", test_parse_option_range_errors);
     CU_add_test(suite3, "test_config_file_parser_errors", test_config_file_parser_errors);
     CU_add_test(suite3, "test_config_parse_single_rule", test_config_parse_single_rule);
+    CU_add_test(suite3, "test_config_parse_serial_gateway", test_config_parse_serial_gateway);
 
     CU_pSuite suite4 = CU_add_suite("Trim functions", NULL, NULL);
     CU_add_test(suite4, "test_trim_functions", test_trim_functions);
