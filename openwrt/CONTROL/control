@@ -1,5 +1,5 @@
 Package: openmmg
-Version: 0.2.1
+Version: 0.3.0
 Depends: libc, libmodbus, libmosquitto
 Source: feeds/packages/net/openmmg
 SourceName: open-modbus-gateway
