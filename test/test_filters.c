@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 
 #include "test.h"
 #include "../src/iprange.h"
@@ -116,6 +117,23 @@ test_filter_match(void) {
 
 	// cleanup
 	free(filter);
+}
+
+void
+test_filter_match_without_filters(void) {
+	request_t request;
+	memset(&request, 0, sizeof(request));
+
+	request.format = 0;
+	request.ip_type = IP_TYPE_IPV4;
+	strncpy(request.ip, "192.168.1.10", sizeof(request.ip) - 1);
+	strncpy(request.port, "502", sizeof(request.port) - 1);
+	request.slave_id = 1;
+	request.function = 3;
+	request.register_addr = 1;
+	request.register_count = 1;
+
+	CU_ASSERT_EQUAL(filter_match(NULL, &request), 0);
 }
 
 void

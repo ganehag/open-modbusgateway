@@ -207,7 +207,7 @@ config rule
   - `stop_bits`: `1` or `2`.
   - `slave_id`: Optional fixed slave ID; when set, requests inherit this value.
   - Optional `ip`/`port` fields can document the TCP side of a gateway deployment.
-  - At least one `config rule` must still be present in the configuration to satisfy gateway validation, even if the deployment primarily uses RTU.
+  - `config rule` sections are optional; if none are present the gateway allows TCP requests without additional filtering.
 
 ### Integration Test Harness
 

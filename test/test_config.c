@@ -200,6 +200,21 @@ test_config_parse_single_rule(void) {
 }
 
 void
+test_validate_config_without_rules(void) {
+    config_t config;
+    memset(&config, 0, sizeof(config));
+
+    strncpy(config.host, "127.0.0.1", sizeof(config.host) - 1);
+    config.port = 1883;
+    config.qos = 0;
+    strncpy(config.client_id, "test-client", sizeof(config.client_id) - 1);
+    strncpy(config.request_topic, "request", sizeof(config.request_topic) - 1);
+    strncpy(config.response_topic, "response", sizeof(config.response_topic) - 1);
+
+    CU_ASSERT_EQUAL(validate_config(&config), 0);
+}
+
+void
 test_config_file_parser_errors(void) {
     // create a temporary file
     FILE *file = tmpfile();

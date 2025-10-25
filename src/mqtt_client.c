@@ -92,7 +92,7 @@ mqtt_message_callback(struct mosquitto *mosq,
         break;
     case 1:
         num_args = sscanf(buffer,
-                          "%hhu %llu %127s %hu %hhu %hhu %u %hu %1023s",
+                          "%hhu %llu %63s %hu %hhu %hhu %u %hu %1023s",
                           &req->format,
                           &req->cookie,
                           serial_token,

@@ -649,11 +649,6 @@ validate_config(config_t *config) {
         return -1;
     }
 
-    // check if config->rules is NULL
-    if (config->head == NULL) {
-        return -2;
-    }
-
     int valid_ipv4 = is_valid_ipv4(config->host);
     int valid_ipv6 = is_valid_ipv6(config->host);
     int valid_hostname = is_valid_hostname(config->host);
