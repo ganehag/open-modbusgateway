@@ -209,6 +209,12 @@ mqtt_message_callback(struct mosquitto *mosq,
             error = MQTT_INVALID_REQUEST;
             goto cleanup;
         }
+
+        if (filter_match(config->head, req) != 0) {
+            error = MQTT_MESSAGE_BLOCKED;
+            flog(logfile, "request blocked {%s}\n", buffer);
+            goto cleanup;
+        }
     }
 
     // Track the pointer to mosq

@@ -6,6 +6,7 @@
 #include "../src/log.h"
 #include "../src/mqtt_client.h"
 #include "../src/request.h"
+#include "../src/filters.h"
 #include "mqtt_test_helpers.h"
 #include "test.h"
 
@@ -32,6 +33,25 @@ setup_basic_config(config_t *config, serial_gateway_t *gateway) {
     gateway->data_bits = 8;
     gateway->stop_bits = 1;
     gateway->next = NULL;
+}
+
+static void
+add_serial_filter(config_t *config,
+                  const char *serial_id,
+                  uint8_t slave_id,
+                  uint8_t function,
+                  uint16_t reg_min,
+                  uint16_t reg_max) {
+    filter_t *filter = calloc(1, sizeof(filter_t));
+    filter->applies_serial = 1;
+    if (serial_id != NULL) {
+        strncpy(filter->serial_id, serial_id, sizeof(filter->serial_id) - 1);
+    }
+    filter->slave_id = slave_id;
+    filter->function_code = function;
+    filter->register_address_min = reg_min;
+    filter->register_address_max = reg_max;
+    filter_add(&config->head, filter);
 }
 
 static struct mosquitto_message
@@ -139,4 +159,54 @@ test_mqtt_format1_missing_write_payload(void) {
     CU_ASSERT_PTR_NULL(mqtt_test_captured_request());
     CU_ASSERT_EQUAL(mqtt_test_publish_count(), 1);
     CU_ASSERT_PTR_NOT_NULL(strstr(mqtt_test_last_payload(), "555 ERROR: INVALID REQUEST"));
+}
+
+void
+test_mqtt_format1_serial_filter_blocks(void) {
+    silence_logs();
+    mqtt_test_reset();
+
+    config_t config;
+    serial_gateway_t gateway;
+    setup_basic_config(&config, &gateway);
+
+    add_serial_filter(&config, "ttyusb0", 5, 3, 0, 5);
+
+    const char *payload = "1 777 ttyusb0 5 5 3 25 2";
+    struct mosquitto_message msg = make_message(payload);
+
+    mqtt_message_callback(NULL, &config, &msg);
+
+    CU_ASSERT_PTR_NULL(mqtt_test_captured_request());
+    CU_ASSERT_EQUAL(mqtt_test_publish_count(), 1);
+    CU_ASSERT_PTR_NOT_NULL(strstr(mqtt_test_last_payload(), "777 ERROR: MESSAGE BLOCKED"));
+
+    filter_free(&config.head);
+}
+
+void
+test_mqtt_format1_serial_filter_allows(void) {
+    silence_logs();
+    mqtt_test_reset();
+
+    config_t config;
+    serial_gateway_t gateway;
+    setup_basic_config(&config, &gateway);
+
+    add_serial_filter(&config, "ttyusb0", 5, 3, 0, 40);
+
+    const char *payload = "1 888 ttyusb0 5 5 3 25 2";
+    struct mosquitto_message msg = make_message(payload);
+
+    mqtt_message_callback(NULL, &config, &msg);
+
+    request_t *captured = mqtt_test_captured_request();
+    CU_ASSERT_PTR_NOT_NULL_FATAL(captured);
+    CU_ASSERT_EQUAL(captured->slave_id, 5);
+    CU_ASSERT_EQUAL(captured->function, 3);
+    CU_ASSERT_EQUAL(mqtt_test_publish_count(), 0);
+
+    free(captured);
+    mqtt_test_release_captured_request();
+    filter_free(&config.head);
 }

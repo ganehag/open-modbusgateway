@@ -8,7 +8,12 @@
 #include "iprange.h"
 
 typedef struct filter {
+    uint8_t applies_tcp;
+    uint8_t applies_serial;
+    uint8_t has_ip_range;
+    uint8_t has_port_range;
     iprange_t iprange;
+    char serial_id[64];
 
     // Port to filter
     uint16_t port_min;

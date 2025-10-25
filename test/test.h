@@ -14,11 +14,13 @@ void test_filter_add(void);
 
 void test_filter_match(void);
 void test_filter_match_without_filters(void);
+void test_filter_match_serial(void);
 void test_multiple_filters_match(void);
 void test_clear_filters(void);
 
 void test_config_parse_single_rule(void);
 void test_config_parse_serial_gateway(void);
+void test_config_parse_serial_rule(void);
 
 void test_config_parse_file(void);
 void test_parse_option_range_ok(void);
@@ -32,5 +34,7 @@ void test_mqtt_format1_slave_override(void);
 void test_mqtt_format1_no_override(void);
 void test_mqtt_format1_reject_extra_token(void);
 void test_mqtt_format1_missing_write_payload(void);
+void test_mqtt_format1_serial_filter_blocks(void);
+void test_mqtt_format1_serial_filter_allows(void);
 
 #endif

@@ -75,59 +75,107 @@ filter_free(filter_t **head) {
     *head = NULL;
 }
 
+static int filter_match_tcp(filter_t *filter, request_t *request);
+static int filter_match_serial(filter_t *filter, request_t *request);
+
 int
 filter_match(filter_t *filters, request_t *request) {
     filter_t *current = filters;
-
-    if (request->format == 1) {
-        // Serial RTU requests are not matched against TCP/IP filters yet
-        return 0;
-    }
 
     if (current == NULL) {
         // No filters configured; allow request
         return 0;
     }
 
+    int has_applicable = 0;
+
     while (current != NULL) {
-        if (filter_match_one(current, request) == 0) {
-            return 0;
+        if (request->format == 0) {
+            if (!current->applies_tcp) {
+                current = current->next;
+                continue;
+            }
+            has_applicable = 1;
+            if (filter_match_one(current, request) == 0) {
+                return 0;
+            }
+        } else if (request->format == 1) {
+            if (!current->applies_serial) {
+                current = current->next;
+                continue;
+            }
+            has_applicable = 1;
+            if (filter_match_serial(current, request) == 0) {
+                return 0;
+            }
+        } else {
+            return -1;
         }
         current = current->next;
     }
 
-    return -1;
+    return has_applicable ? -1 : 0;
 }
 
 // function to check if a message matches the content of request_t
 // return 0 on success, -1 on failure
 int
 filter_match_one(filter_t *filter, request_t *request) {
+    return filter_match_tcp(filter, request);
+}
+
+static int
+filter_match_tcp(filter_t *filter, request_t *request) {
     char ip[INET6_ADDRSTRLEN];
-    memset(ip, 0, INET6_ADDRSTRLEN);
+    memset(ip, 0, sizeof(ip));
 
-    // check if request is in IPv4 or IPv6 format
-    if (request->ip_type == IP_TYPE_IPV4) {
-        // convert IPv4 to IPv6
-        snprintf(ip, INET6_ADDRSTRLEN, "::ffff:%s", request->ip);
-    } else if (request->ip_type == IP_TYPE_IPV6) {
-        strncpy(ip, request->ip, INET6_ADDRSTRLEN);
-    } else if (request->ip_type == IP_TYPE_HOSTNAME) {
-        // TODO: implement hostname lookup
-        return -1;
-    } else {
-        // unknown ip_type
+    if (filter->has_ip_range) {
+        if (request->ip_type == IP_TYPE_IPV4) {
+            snprintf(ip, sizeof(ip), "::ffff:%s", request->ip);
+        } else if (request->ip_type == IP_TYPE_IPV6) {
+            strncpy(ip, request->ip, sizeof(ip));
+            ip[sizeof(ip) - 1] = '\0';
+        } else if (request->ip_type == IP_TYPE_HOSTNAME) {
+            return -1;
+        } else {
+            return -1;
+        }
+
+        if (ip_in_range(ip, &filter->iprange) != 0) {
+            return -1;
+        }
+    }
+
+    if (filter->has_port_range) {
+        uint16_t port = (uint16_t)atoi(request->port);
+        if (port < filter->port_min || port > filter->port_max) {
+            return -1;
+        }
+    }
+
+    if (filter->slave_id != request->slave_id) {
         return -1;
     }
 
-    // check if ip is in range
-    if (ip_in_range(ip, &filter->iprange) != 0) {
+    if (filter->function_code != request->function) {
         return -1;
     }
 
-    uint16_t port = atoi(request->port);
-    // ensure port is within range
-    if (port < filter->port_min || port > filter->port_max) {
+    if (request->register_addr < filter->register_address_min ||
+        request->register_addr > filter->register_address_max) {
+        return -1;
+    }
+
+    return 0;
+}
+
+static int
+filter_match_serial(filter_t *filter, request_t *request) {
+    if (filter->serial_id[0] != '\0' &&
+        strcmp(filter->serial_id, "*") != 0 &&
+        strncmp(filter->serial_id,
+                request->serial_id,
+                sizeof(filter->serial_id)) != 0) {
         return -1;
     }
 
@@ -139,7 +187,6 @@ filter_match_one(filter_t *filter, request_t *request) {
         return -1;
     }
 
-    // check if register is in range of min and max addresses
     if (request->register_addr < filter->register_address_min ||
         request->register_addr > filter->register_address_max) {
         return -1;
@@ -150,23 +197,32 @@ filter_match_one(filter_t *filter, request_t *request) {
 
 void
 filter_print(filter_t *filter) {
-    // convert iprange.ipaddr to string
     char ipaddr[INET6_ADDRSTRLEN];
-    memset(ipaddr, 0, INET6_ADDRSTRLEN);
-    inet_ntop(AF_INET6, &filter->iprange.ipaddr, ipaddr, INET6_ADDRSTRLEN);
+    memset(ipaddr, 0, sizeof(ipaddr));
 
-    // convert iprange.netmask to string
     char netmask[INET6_ADDRSTRLEN];
-    memset(netmask, 0, INET6_ADDRSTRLEN);
-    inet_ntop(AF_INET6, &filter->iprange.netmask, netmask, INET6_ADDRSTRLEN);
+    memset(netmask, 0, sizeof(netmask));
 
-    // print the filter in a structured way
-    printf("Filter: %s/%s:%d-%d, slave_id: %d, function_code: %d, "
-           "register_address: %d-%d, is_last: %d\n",
-           ipaddr,
-           netmask,
-           filter->port_min,
-           filter->port_max,
+    if (filter->has_ip_range) {
+        inet_ntop(AF_INET6, &filter->iprange.ipaddr, ipaddr, sizeof(ipaddr));
+        inet_ntop(
+            AF_INET6, &filter->iprange.netmask, netmask, sizeof(netmask));
+    }
+
+    printf("Filter: ");
+    if (filter->applies_tcp && filter->has_ip_range) {
+        printf("%s/%s:%d-%d ",
+               ipaddr,
+               netmask,
+               filter->port_min,
+               filter->port_max);
+    }
+    if (filter->applies_serial) {
+        printf("serial_id: %s ",
+               filter->serial_id[0] != '\0' ? filter->serial_id : "(any)");
+    }
+    printf("slave_id: %d, function_code: %d, register_address: %d-%d, "
+           "is_last: %d\n",
            filter->slave_id,
            filter->function_code,
            filter->register_address_min,

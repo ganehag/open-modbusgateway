@@ -14,12 +14,15 @@ test_filter_add(void) {
 	// loop through the filters and add them to the list
 	for (int i = 0; i < 20; i++) {
 		// allocate the new filter
-		filter_t *new_filter = malloc(sizeof(filter_t));
+		filter_t *new_filter = calloc(1, sizeof(filter_t));
 		new_filter->next = NULL;
 
 		// assign values to the filter
 		CU_ASSERT_EQUAL(ip_cidr_to_in6("::ffff:192.168.1.1/120", &new_filter->iprange), 0);
 
+		new_filter->applies_tcp = 1;
+		new_filter->has_ip_range = 1;
+		new_filter->has_port_range = 1;
 		new_filter->port_min = 502;
 		new_filter->port_max = 502;
 		new_filter->slave_id = 1;
@@ -45,13 +48,15 @@ test_filter_add(void) {
 
 void
 test_filter_match(void) {
-	filter_t *filter = malloc(sizeof(filter_t));
-	memset(filter, 0, sizeof(filter_t));
+filter_t *filter = calloc(1, sizeof(filter_t));
 
-	CU_ASSERT_EQUAL(ip_cidr_to_in6("::ffff:192.168.1.1/120", &filter->iprange), 0);
+CU_ASSERT_EQUAL(ip_cidr_to_in6("::ffff:192.168.1.1/120", &filter->iprange), 0);
 
-	filter->port_min = 502;
-	filter->port_max = 505;
+filter->applies_tcp = 1;
+filter->has_ip_range = 1;
+filter->has_port_range = 1;
+filter->port_min = 502;
+filter->port_max = 505;
 	filter->slave_id = 1;
 	filter->function_code = 3; // Read Holding Registers
 	filter->register_address_min = 0;
@@ -137,17 +142,54 @@ test_filter_match_without_filters(void) {
 }
 
 void
+test_filter_match_serial(void) {
+	filter_t *filters_head = NULL;
+
+	filter_t *serial_filter = calloc(1, sizeof(filter_t));
+	serial_filter->applies_serial = 1;
+	strncpy(serial_filter->serial_id, "ttyusb0", sizeof(serial_filter->serial_id) - 1);
+	serial_filter->slave_id = 3;
+	serial_filter->function_code = 3;
+	serial_filter->register_address_min = 0;
+	serial_filter->register_address_max = 10;
+
+	filter_add(&filters_head, serial_filter);
+
+	request_t request;
+	memset(&request, 0, sizeof(request));
+	request.format = 1;
+	strncpy(request.serial_id, "ttyusb0", sizeof(request.serial_id) - 1);
+	request.slave_id = 3;
+	request.function = 3;
+	request.register_addr = 5;
+
+	CU_ASSERT_EQUAL(filter_match(filters_head, &request), 0);
+
+	strncpy(request.serial_id, "ttyusb1", sizeof(request.serial_id) - 1);
+	CU_ASSERT_EQUAL(filter_match(filters_head, &request), -1);
+
+	strncpy(request.serial_id, "ttyusb0", sizeof(request.serial_id) - 1);
+	request.register_addr = 20;
+	CU_ASSERT_EQUAL(filter_match(filters_head, &request), -1);
+
+	filter_free(&filters_head);
+}
+
+void
 test_multiple_filters_match(void) {
 	filter_t *filters_head = NULL;
 	filter_t *current = filters_head;
 
 	// allocate the new filter
-	filter_t *filter1 = malloc(sizeof(filter_t));
+	filter_t *filter1 = calloc(1, sizeof(filter_t));
 	filter1->next = NULL;
 
 	// assign values to the filter
 	CU_ASSERT_EQUAL(ip_cidr_to_in6("::ffff:192.168.1.1/128", &filter1->iprange), 0);
 
+	filter1->applies_tcp = 1;
+	filter1->has_ip_range = 1;
+	filter1->has_port_range = 1;
 	filter1->port_min = 502;
 	filter1->port_max = 502;
 	filter1->slave_id = 1;
@@ -158,12 +200,15 @@ test_multiple_filters_match(void) {
 	filter_add(&filters_head, filter1);
 
 	// allocate the new filter
-	filter_t *filter2 = malloc(sizeof(filter_t));
+	filter_t *filter2 = calloc(1, sizeof(filter_t));
 	filter2->next = NULL;
 
 	// assign values to the filter
 	CU_ASSERT_EQUAL(ip_cidr_to_in6("::ffff:192.168.1.2/128", &filter2->iprange), 0);
 
+	filter2->applies_tcp = 1;
+	filter2->has_ip_range = 1;
+	filter2->has_port_range = 1;
 	filter2->port_min = 502;
 	filter2->port_max = 502;
 	filter2->slave_id = 1;
@@ -174,12 +219,15 @@ test_multiple_filters_match(void) {
 	filter_add(&filters_head, filter2);
 
 	// allocate the new filter
-	filter_t *filter3 = malloc(sizeof(filter_t));
+	filter_t *filter3 = calloc(1, sizeof(filter_t));
 	filter3->next = NULL;
 
 	// assign values to the filter
 	CU_ASSERT_EQUAL(ip_cidr_to_in6("::ffff:192.168.1.100/128", &filter3->iprange), 0);
 
+	filter3->applies_tcp = 1;
+	filter3->has_ip_range = 1;
+	filter3->has_port_range = 1;
 	filter3->port_min = 502;
 	filter3->port_max = 502;
 	filter3->slave_id = 1;

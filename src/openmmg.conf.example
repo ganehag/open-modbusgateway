@@ -40,3 +40,9 @@ config rule
 	option slave_id '1'
 	option function '3'
 	option register_address '100-200'
+
+config rule
+	option serial_id 'ttyusb0'
+	option slave_id '2'
+	option function '3'
+	option register_address '0-100'

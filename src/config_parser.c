@@ -239,6 +239,9 @@ config_parse_file(FILE *file, config_t *config) {
                     if (parse_error != 0) {
                         return CONFIG_PARSER_ERROR_INVALID_REGISTER_ADDRESS;
                     }
+                } else if (strncmp(name, "serial_id", 9) == 0) {
+                    strncpy(rule.serial_id, value, sizeof(rule.serial_id));
+                    rule.serial_id[sizeof(rule.serial_id) - 1] = '\0';
                 }
             } else if (in_config_serial_gateway) {
                 if (strncmp(name, "id", 2) == 0) {
@@ -535,32 +538,80 @@ handle_filter_row(config_t *config, rule_t *rule) {
     // since each rule contains multiple port ranges, and multiple register
     // address ranges, we need to add the rule multiple times
 
-    // loop over all the port ranges until we find a rule that is not
-    // initialized
+    int has_ip = (rule->ip[0] != '\0');
+    int has_serial = (rule->serial_id[0] != '\0');
+
+    int port_count = 0;
     for (int i = 0; i < MAX_RANGES; i++) {
         if (rule->port[i].initialized == 0) {
             break;
         }
-        // loop over all the register address ranges until we find a rule that
-        // is not initialized
-        for (int j = 0; j < MAX_RANGES; j++) {
-            if (rule->register_addr[j].initialized == 0) {
-                break;
-            }
+        port_count++;
+    }
 
+    int register_count = 0;
+    for (int i = 0; i < MAX_RANGES; i++) {
+        if (rule->register_addr[i].initialized == 0) {
+            break;
+        }
+        register_count++;
+    }
+
+    if (register_count == 0) {
+        return;
+    }
+
+    if (port_count == 0) {
+        port_count = 1;
+    }
+
+    for (int i = 0; i < port_count; i++) {
+        uint16_t port_min = 0;
+        uint16_t port_max = 0;
+        uint8_t has_port_range = 0;
+
+        if (i < MAX_RANGES && rule->port[i].initialized != 0) {
+            port_min = rule->port[i].min;
+            port_max = rule->port[i].max;
+            has_port_range = 1;
+        }
+
+        for (int j = 0; j < register_count; j++) {
             filter_t *new_filter = calloc(1, sizeof(filter_t));
-            if (ip_cidr_to_in6(rule->ip, &new_filter->iprange) != 0) {
-                return; // unable to parse ip
+            if (new_filter == NULL) {
+                return;
             }
 
             new_filter->slave_id = rule->slave_id;
             new_filter->function_code = rule->function;
-            new_filter->port_min = rule->port[i].min;
-            new_filter->port_max = rule->port[i].max;
             new_filter->register_address_min = rule->register_addr[j].min;
             new_filter->register_address_max = rule->register_addr[j].max;
+            new_filter->port_min = port_min;
+            new_filter->port_max = port_max;
+            new_filter->has_port_range = has_port_range;
 
-            // add the rule to the filter
+            if (has_ip) {
+                new_filter->applies_tcp = 1;
+                new_filter->has_ip_range = 1;
+                if (ip_cidr_to_in6(rule->ip, &new_filter->iprange) != 0) {
+                    free(new_filter);
+                    continue;
+                }
+            }
+
+            if (has_serial) {
+                new_filter->applies_serial = 1;
+                strncpy(new_filter->serial_id,
+                        rule->serial_id,
+                        sizeof(new_filter->serial_id));
+                new_filter->serial_id[sizeof(new_filter->serial_id) - 1] = '\0';
+            }
+
+            if (!new_filter->applies_tcp && !new_filter->applies_serial) {
+                free(new_filter);
+                continue;
+            }
+
             filter_add(&config->head, new_filter);
         }
     }

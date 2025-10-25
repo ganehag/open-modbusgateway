@@ -24,6 +24,7 @@ int main() {
     CU_add_test(suite2,
                 "test_filter_match_without_filters",
                 test_filter_match_without_filters);
+    CU_add_test(suite2, "test_filter_match_serial", test_filter_match_serial);
     CU_add_test(suite2, "test_multiple_filters_match", test_multiple_filters_match);
 
     CU_pSuite suite3 = CU_add_suite("Config functions", NULL, NULL);
@@ -33,6 +34,7 @@ int main() {
     CU_add_test(suite3, "test_config_file_parser_errors", test_config_file_parser_errors);
     CU_add_test(suite3, "test_config_parse_single_rule", test_config_parse_single_rule);
     CU_add_test(suite3, "test_config_parse_serial_gateway", test_config_parse_serial_gateway);
+    CU_add_test(suite3, "test_config_parse_serial_rule", test_config_parse_serial_rule);
     CU_add_test(suite3,
                 "test_validate_config_without_rules",
                 test_validate_config_without_rules);
@@ -53,6 +55,12 @@ int main() {
     CU_add_test(suite5,
                 "test_mqtt_format1_missing_write_payload",
                 test_mqtt_format1_missing_write_payload);
+    CU_add_test(suite5,
+                "test_mqtt_format1_serial_filter_blocks",
+                test_mqtt_format1_serial_filter_blocks);
+    CU_add_test(suite5,
+                "test_mqtt_format1_serial_filter_allows",
+                test_mqtt_format1_serial_filter_allows);
 
     CU_basic_set_mode(CU_BRM_VERBOSE);
     CU_basic_run_tests();
