@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 
 #include "../src/config_parser.h"
 #include "../src/filters.h"
@@ -48,63 +49,19 @@ const char file_content_too_many_port_ranges[] =
     "    option function '3'\n"
     "    option register_address '0-100'\n\n";
 
-void
-callback_function_helper(void *data, rule_t *rule) {
-    if (data == NULL) {
-        return;
-    }
+const char file_content_serial_gateway[] = "config serial_gateway\n"
+                                           "    option id 'ttyusb0'\n"
+                                           "    option device '/dev/ttyUSB0'\n"
+                                           "    option baudrate '115200'\n"
+                                           "    option parity 'even'\n"
+                                           "    option data_bits '8'\n"
+                                           "    option stop_bits '1'\n"
+                                           "    option slave_id '3'\n";
 
-    // data is a pointer to a filter_t struct
-    filter_t **head = (filter_t **)data;
-
-    // loop over all the port ranges until we find a rule that is not
-    // initialized
-    for (int i = 0; i < MAX_RANGES; i++) {
-        if (rule->port[i].initialized == 0) {
-            break;
-        }
-    }
-
-    // the same, but for register_address
-    for (int i = 0; i < MAX_RANGES; i++) {
-        if (rule->register_addr[i].initialized == 0) {
-            break;
-        }
-    }
-
-    // add the rule to the filter, so we can check it later
-    // since each rule contains multiple port ranges, and multiple register
-    // address ranges, we need to add the rule multiple times
-
-    // loop over all the port ranges until we find a rule that is not
-    // initialized
-    for (int i = 0; i < MAX_RANGES; i++) {
-        if (rule->port[i].initialized == 0) {
-            break;
-        }
-        // loop over all the register address ranges until we find a rule that
-        // is not initialized
-        for (int j = 0; j < MAX_RANGES; j++) {
-            if (rule->register_addr[j].initialized == 0) {
-                break;
-            }
-
-            filter_t *new_filter = calloc(1, sizeof(filter_t));
-            if (ip_cidr_to_in6(rule->ip, &new_filter->iprange) != 0) {
-                return; // unable to parse ip
-            }
-
-            new_filter->slave_id = rule->slave_id;
-            new_filter->function_code = rule->function;
-            new_filter->port_min = rule->port[i].min;
-            new_filter->port_max = rule->port[i].max;
-            new_filter->register_address_min = rule->register_addr[j].min;
-            new_filter->register_address_max = rule->register_addr[j].max;
-
-            // add the rule to the filter
-            filter_add(head, new_filter);
-        }
-    }
+static void
+config_free_lists(config_t *config) {
+    filter_free(&config->head);
+    serial_gateway_free(&config->serial_head);
 }
 
 void
@@ -119,11 +76,13 @@ test_config_parse_file(void) {
     // rewind the file
     rewind(file);
 
-    // parse the file
-    // int config_parse_file(FILE *file, void (*callback)(void *data, rule_t
-    // *rule), void *user_obj);
-    CU_ASSERT_EQUAL(config_parse_file(file, &callback_function_helper, NULL),
-                    0);
+    config_t config;
+    memset(&config, 0, sizeof(config));
+
+    CU_ASSERT_EQUAL(config_parse_file(file, &config), 0);
+    CU_ASSERT_PTR_NOT_NULL(config.head);
+
+    config_free_lists(&config);
 
     // remove the file
     fclose(file); // not needed, but good practice
@@ -136,22 +95,19 @@ test_config_parse_single_rule(void) {
     CU_ASSERT_PTR_NOT_NULL_FATAL(file);
 
     // filter head to store the rules
-    filter_t *head = NULL;
-
     // write some lines to the file
     fprintf(file, "%s", file_content_single);
 
     // rewind the file
     rewind(file);
 
-    // parse the file
-    // int config_parse_file(FILE *file, void (*callback)(void *data, rule_t
-    // *rule), void *user_obj);
-    CU_ASSERT_EQUAL(config_parse_file(file, &callback_function_helper, &head),
-                    0);
+    config_t config;
+    memset(&config, 0, sizeof(config));
+
+    CU_ASSERT_EQUAL(config_parse_file(file, &config), 0);
 
     // check the config
-    CU_ASSERT_PTR_NOT_NULL(head);
+    CU_ASSERT_PTR_NOT_NULL(config.head);
 
     iprange_t expected_cidr = {// ::ffff:192.168.100.1
                                .ipaddr = {.s6_addr = {0x00,
@@ -206,18 +162,17 @@ test_config_parse_single_rule(void) {
                                           }};
 
     // loop all the rules
-    filter_t *current = head;
+    filter_t *current = config.head;
     int i = 0;
     while (current != NULL) {
-        // check the ip
-        // debug print the ip
-        char ip[INET6_ADDRSTRLEN];
-        inet_ntop(AF_INET6, &current->iprange.netmask, ip, sizeof(ip));
-
-        CU_ASSERT_STRING_EQUAL(current->iprange.ipaddr.s6_addr,
-                               expected_cidr.ipaddr.s6_addr);
-        CU_ASSERT_STRING_EQUAL(current->iprange.netmask.s6_addr,
-                               expected_cidr.netmask.s6_addr);
+        CU_ASSERT_EQUAL(memcmp(&current->iprange.ipaddr,
+                               &expected_cidr.ipaddr,
+                               sizeof(expected_cidr.ipaddr)),
+                        0);
+        CU_ASSERT_EQUAL(memcmp(&current->iprange.netmask,
+                               &expected_cidr.netmask,
+                               sizeof(expected_cidr.netmask)),
+                        0);
 
         // check slave id
         CU_ASSERT_EQUAL(current->slave_id, 1);
@@ -238,10 +193,25 @@ test_config_parse_single_rule(void) {
     }
 
     // free the filter list
-    filter_free(&head);
+    config_free_lists(&config);
 
     // remove the file
     fclose(file); // not needed, but good practice
+}
+
+void
+test_validate_config_without_rules(void) {
+    config_t config;
+    memset(&config, 0, sizeof(config));
+
+    strncpy(config.host, "127.0.0.1", sizeof(config.host) - 1);
+    config.port = 1883;
+    config.qos = 0;
+    strncpy(config.client_id, "test-client", sizeof(config.client_id) - 1);
+    strncpy(config.request_topic, "request", sizeof(config.request_topic) - 1);
+    strncpy(config.response_topic, "response", sizeof(config.response_topic) - 1);
+
+    CU_ASSERT_EQUAL(validate_config(&config), 0);
 }
 
 void
@@ -256,14 +226,46 @@ test_config_file_parser_errors(void) {
     // rewind the file
     rewind(file);
 
-    // parse the file
-    int error;
-    error = config_parse_file(file, NULL, NULL);
+    config_t config;
+    memset(&config, 0, sizeof(config));
+
+    int error = config_parse_file(file, &config);
 
     CU_ASSERT_NOT_EQUAL(error, 0);
 
+    config_free_lists(&config);
+
     // remove the file
     fclose(file); // not needed, but good practice
+}
+
+void
+test_config_parse_serial_gateway(void) {
+    FILE *file = tmpfile();
+    CU_ASSERT_PTR_NOT_NULL_FATAL(file);
+
+    fprintf(file, "%s", file_content_serial_gateway);
+    rewind(file);
+
+    config_t config;
+    memset(&config, 0, sizeof(config));
+
+    CU_ASSERT_EQUAL(config_parse_file(file, &config), 0);
+
+    serial_gateway_t *gateway = config.serial_head;
+    CU_ASSERT_PTR_NOT_NULL(gateway);
+    CU_ASSERT_STRING_EQUAL(gateway->id, "ttyusb0");
+    CU_ASSERT_STRING_EQUAL(gateway->device, "/dev/ttyUSB0");
+    CU_ASSERT_EQUAL(gateway->baudrate, 115200);
+    CU_ASSERT_EQUAL(gateway->parity, 'E');
+    CU_ASSERT_EQUAL(gateway->data_bits, 8);
+    CU_ASSERT_EQUAL(gateway->stop_bits, 1);
+    CU_ASSERT_EQUAL(gateway->slave_id, 3);
+
+    CU_ASSERT_PTR_NULL(gateway->next);
+
+    config_free_lists(&config);
+    fclose(file);
 }
 
 void

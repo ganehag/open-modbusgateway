@@ -68,7 +68,7 @@ join_regs_str(const uint16_t datalen, const uint16_t *data, const char *sep) {
 
 void *
 handle_request(void *arg) {
-    modbus_t *ctx;
+    modbus_t *ctx = NULL;
     request_t *req = (request_t *)arg;
     uint16_t req_count;
 
@@ -81,19 +81,34 @@ handle_request(void *arg) {
 
 #ifdef DEBUG
     flog(logfile, "void *handle_request(void *arg)\n");
-    flog(logfile,
-         "1: %hhu 2:%llu 3:%hhu 4:%s 5:%s 6:%hu 7:%hhu 8:%hhu 9:%u 10:%hu\n",
-         req->format,        // %d
-         req->cookie,        // %llu
-         req->ip_type,       // %d (Will be managed by modbus_new_tcp_pi)
-         req->ip,            // %s
-         req->port,          // %s (Yes, as string)
-         req->timeout,       // %d
-         req->slave_id,      // %d
-         req->function,      // %d
-         req->register_addr, // %d (is register number in request format)
-         req->register_count // %d (is the value if function is 6)
-    );
+    if (req->format == 1) {
+        flog(logfile,
+             "format 1: %hhu %llu %s %s %d-%c-%d-%d %hu %hhu %u %hu\n",
+             req->format,
+             req->cookie,
+             req->serial_id,
+             req->serial_device,
+             req->serial_baud,
+             req->serial_parity,
+             req->serial_data_bits,
+             req->serial_stop_bits,
+             req->timeout,
+             req->slave_id,
+             req->register_addr,
+             req->register_count);
+    } else {
+        flog(logfile,
+             "format 0: %hhu %llu %hhu %s %s %hu %hhu %u %hu\n",
+             req->format,
+             req->cookie,
+             req->ip_type,
+             req->ip,
+             req->port,
+             req->timeout,
+             req->slave_id,
+             req->register_addr,
+             req->register_count);
+    }
 #endif
 
     // Detach from the parent thread (join not required)
@@ -108,8 +123,24 @@ handle_request(void *arg) {
         goto pthread_exit;
     }
 
-    // IPv4 & IPv6 support
-    ctx = modbus_new_tcp_pi(req->ip, req->port);
+    if (req->format == 1) {
+        ctx = modbus_new_rtu(req->serial_device,
+                             req->serial_baud,
+                             req->serial_parity,
+                             req->serial_data_bits,
+                             req->serial_stop_bits);
+    } else {
+        ctx = modbus_new_tcp_pi(req->ip, req->port);
+    }
+
+    if (ctx == NULL) {
+        mqtt_reply_error(req->mosq,
+                         req->response_topic,
+                         req->cookie,
+                         MQTT_ERROR_MESSAGE,
+                         modbus_strerror(errno));
+        goto modbus_cleanup;
+    }
 
     // Set the timeout
     modbus_set_response_timeout(ctx, req->timeout, 0);
@@ -296,8 +327,10 @@ handle_request(void *arg) {
 modbus_cleanup:
 
     // Modbus clean-up
-    modbus_close(ctx);
-    modbus_free(ctx);
+    if (ctx != NULL) {
+        modbus_close(ctx);
+        modbus_free(ctx);
+    }
 
     // Must free the allocated argument
     free(req);

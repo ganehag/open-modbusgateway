@@ -79,6 +79,16 @@ int
 filter_match(filter_t *filters, request_t *request) {
     filter_t *current = filters;
 
+    if (request->format == 1) {
+        // Serial RTU requests are not matched against TCP/IP filters yet
+        return 0;
+    }
+
+    if (current == NULL) {
+        // No filters configured; allow request
+        return 0;
+    }
+
     while (current != NULL) {
         if (filter_match_one(current, request) == 0) {
             return 0;

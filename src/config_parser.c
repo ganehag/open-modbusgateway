@@ -110,10 +110,12 @@ int
 config_parse_file(FILE *file, config_t *config) {
     char line[MAX_LINE_LEN];
     rule_t rule;
+    serial_gateway_t serial_gateway;
 
     int in_config = 0;
     int in_config_rule = 0;
     int in_config_mqtt = 0;
+    int in_config_serial_gateway = 0;
 
     int line_number = -1; // -1 because of the first line, which will increment
                           // line_number to 0
@@ -139,11 +141,32 @@ config_parse_file(FILE *file, config_t *config) {
             continue;
         }
 
+        if (strncmp(line, "config serial_gateway", 21) == 0) {
+            in_config_serial_gateway = 1;
+            in_config = 1;
+            memset(&serial_gateway, 0, sizeof(serial_gateway_t));
+            serial_gateway.baudrate = RTU_DEFAULT_BAUD;
+            serial_gateway.parity = RTU_DEFAULT_PARITY;
+            serial_gateway.data_bits = RTU_DEFAULT_DATA_BITS;
+            serial_gateway.stop_bits = RTU_DEFAULT_STOP_BITS;
+            continue;
+        }
+
         // check for end of config rule
         if (in_config_rule && line[0] == '\0') {
             handle_filter_row(config, &rule);
 
             in_config_rule = 0;
+            in_config = 0;
+            continue;
+        }
+
+        if (in_config_serial_gateway && line[0] == '\0') {
+            int sg_error = handle_serial_gateway_row(config, &serial_gateway);
+            if (sg_error != 0) {
+                return sg_error;
+            }
+            in_config_serial_gateway = 0;
             in_config = 0;
             continue;
         }
@@ -216,6 +239,62 @@ config_parse_file(FILE *file, config_t *config) {
                     if (parse_error != 0) {
                         return CONFIG_PARSER_ERROR_INVALID_REGISTER_ADDRESS;
                     }
+                }
+            } else if (in_config_serial_gateway) {
+                if (strncmp(name, "id", 2) == 0) {
+                    strncpy(
+                        serial_gateway.id, value, sizeof(serial_gateway.id));
+                } else if (strncmp(name, "device", 6) == 0) {
+                    strncpy(serial_gateway.device,
+                            value,
+                            sizeof(serial_gateway.device));
+                } else if (strncmp(name, "ip", 2) == 0) {
+                    strncpy(
+                        serial_gateway.ip, value, sizeof(serial_gateway.ip));
+                } else if (strncmp(name, "port", 4) == 0) {
+                    errno = 0;
+                    long parsed_port = strtol(value, NULL, 10);
+                    if (errno != 0 || parsed_port < 0 || parsed_port > 65535) {
+                        return CONFIG_PARSER_ERROR_INVALID_SERIAL_GATEWAY;
+                    }
+                    serial_gateway.port = (uint16_t)parsed_port;
+                } else if (strncmp(name, "baudrate", 8) == 0) {
+                    int parsed_baud = atoi(value);
+                    if (parsed_baud <= 0) {
+                        return CONFIG_PARSER_ERROR_INVALID_SERIAL_GATEWAY;
+                    }
+                    serial_gateway.baudrate = parsed_baud;
+                } else if (strncmp(name, "parity", 6) == 0) {
+                    char parity = toupper((unsigned char)value[0]);
+                    if (strncmp(value, "none", 4) == 0) {
+                        parity = 'N';
+                    } else if (strncmp(value, "even", 4) == 0) {
+                        parity = 'E';
+                    } else if (strncmp(value, "odd", 3) == 0) {
+                        parity = 'O';
+                    }
+                    if (parity != 'N' && parity != 'E' && parity != 'O') {
+                        return CONFIG_PARSER_ERROR_INVALID_SERIAL_GATEWAY;
+                    }
+                    serial_gateway.parity = parity;
+                } else if (strncmp(name, "stop_bits", 9) == 0) {
+                    int parsed_stop = atoi(value);
+                    if (parsed_stop != 1 && parsed_stop != 2) {
+                        return CONFIG_PARSER_ERROR_INVALID_SERIAL_GATEWAY;
+                    }
+                    serial_gateway.stop_bits = parsed_stop;
+                } else if (strncmp(name, "data_bits", 9) == 0) {
+                    int parsed_data = atoi(value);
+                    if (parsed_data < 5 || parsed_data > 8) {
+                        return CONFIG_PARSER_ERROR_INVALID_SERIAL_GATEWAY;
+                    }
+                    serial_gateway.data_bits = parsed_data;
+                } else if (strncmp(name, "slave_id", 8) == 0) {
+                    int parsed_slave = atoi(value);
+                    if (parsed_slave < 0 || parsed_slave > 247) {
+                        return CONFIG_PARSER_ERROR_INVALID_SERIAL_GATEWAY;
+                    }
+                    serial_gateway.slave_id = (uint8_t)parsed_slave;
                 }
             } else if (in_config_mqtt) {
                 // MQTT config options
@@ -312,6 +391,13 @@ config_parse_file(FILE *file, config_t *config) {
 
     if (in_config_rule) {
         handle_filter_row(config, &rule);
+    }
+
+    if (in_config_serial_gateway) {
+        int sg_error = handle_serial_gateway_row(config, &serial_gateway);
+        if (sg_error != 0) {
+            return sg_error;
+        }
     }
 
     return 0;
@@ -481,15 +567,86 @@ handle_filter_row(config_t *config, rule_t *rule) {
 }
 
 int
+handle_serial_gateway_row(config_t *config, serial_gateway_t *gateway) {
+    if (config == NULL || gateway == NULL) {
+        return CONFIG_PARSER_ERROR_INVALID_SERIAL_GATEWAY;
+    }
+
+    if (strlen(gateway->id) == 0 || strlen(gateway->device) == 0) {
+        return CONFIG_PARSER_ERROR_INVALID_SERIAL_GATEWAY;
+    }
+
+    if (gateway->baudrate <= 0) {
+        return CONFIG_PARSER_ERROR_INVALID_SERIAL_GATEWAY;
+    }
+
+    if (gateway->parity != 'N' && gateway->parity != 'E' &&
+        gateway->parity != 'O') {
+        return CONFIG_PARSER_ERROR_INVALID_SERIAL_GATEWAY;
+    }
+
+    if (gateway->data_bits < 5 || gateway->data_bits > 8) {
+        return CONFIG_PARSER_ERROR_INVALID_SERIAL_GATEWAY;
+    }
+
+    if (gateway->stop_bits != 1 && gateway->stop_bits != 2) {
+        return CONFIG_PARSER_ERROR_INVALID_SERIAL_GATEWAY;
+    }
+
+    if (gateway->slave_id > 247) {
+        return CONFIG_PARSER_ERROR_INVALID_SERIAL_GATEWAY;
+    }
+
+    serial_gateway_t *existing =
+        serial_gateway_find(config->serial_head, gateway->id);
+
+    if (existing != NULL) {
+        strncpy(existing->device, gateway->device, sizeof(existing->device));
+        strncpy(existing->ip, gateway->ip, sizeof(existing->ip));
+        existing->port = gateway->port;
+        existing->baudrate = gateway->baudrate;
+        existing->parity = gateway->parity;
+        existing->data_bits = gateway->data_bits;
+        existing->stop_bits = gateway->stop_bits;
+        existing->slave_id = gateway->slave_id;
+        return 0;
+    }
+
+    serial_gateway_t *entry = calloc(1, sizeof(serial_gateway_t));
+    if (entry == NULL) {
+        return CONFIG_PARSER_ERROR;
+    }
+
+    strncpy(entry->id, gateway->id, sizeof(entry->id));
+    strncpy(entry->device, gateway->device, sizeof(entry->device));
+    strncpy(entry->ip, gateway->ip, sizeof(entry->ip));
+    entry->port = gateway->port;
+    entry->baudrate = gateway->baudrate;
+    entry->parity = gateway->parity;
+    entry->data_bits = gateway->data_bits;
+    entry->stop_bits = gateway->stop_bits;
+    entry->slave_id = gateway->slave_id;
+
+    entry->next = NULL;
+
+    if (config->serial_head == NULL) {
+        config->serial_head = entry;
+    } else {
+        serial_gateway_t *current = config->serial_head;
+        while (current->next != NULL) {
+            current = current->next;
+        }
+        current->next = entry;
+    }
+
+    return 0;
+}
+
+int
 validate_config(config_t *config) {
     // check if config is NULL
     if (config == NULL) {
         return -1;
-    }
-
-    // check if config->rules is NULL
-    if (config->head == NULL) {
-        return -2;
     }
 
     int valid_ipv4 = is_valid_ipv4(config->host);
@@ -535,6 +692,41 @@ validate_config(config_t *config) {
     }
 
     return 0;
+}
+
+serial_gateway_t *
+serial_gateway_find(serial_gateway_t *head, const char *id) {
+    if (id == NULL) {
+        return NULL;
+    }
+
+    serial_gateway_t *current = head;
+    while (current != NULL) {
+        if (strcmp(current->id, id) == 0) {
+            return current;
+        }
+        current = current->next;
+    }
+
+    return NULL;
+}
+
+void
+serial_gateway_free(serial_gateway_t **head) {
+    if (head == NULL || *head == NULL) {
+        return;
+    }
+
+    serial_gateway_t *current = *head;
+    serial_gateway_t *next = NULL;
+
+    while (current != NULL) {
+        next = current->next;
+        free(current);
+        current = next;
+    }
+
+    *head = NULL;
 }
 
 int

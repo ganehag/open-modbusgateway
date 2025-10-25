@@ -21,17 +21,38 @@ int main() {
     CU_pSuite suite2 = CU_add_suite("Filter functions", NULL, NULL);
     CU_add_test(suite2, "test_filter_add", test_filter_add);
     CU_add_test(suite2, "test_filter_match", test_filter_match);
+    CU_add_test(suite2,
+                "test_filter_match_without_filters",
+                test_filter_match_without_filters);
     CU_add_test(suite2, "test_multiple_filters_match", test_multiple_filters_match);
-    
+
     CU_pSuite suite3 = CU_add_suite("Config functions", NULL, NULL);
     CU_add_test(suite3, "test_config_parse_file", test_config_parse_file);
     CU_add_test(suite3, "test_parse_option_range_ok", test_parse_option_range_ok);
     // CU_add_test(suite3, "test_parse_option_range_errors", test_parse_option_range_errors);
     CU_add_test(suite3, "test_config_file_parser_errors", test_config_file_parser_errors);
     CU_add_test(suite3, "test_config_parse_single_rule", test_config_parse_single_rule);
+    CU_add_test(suite3, "test_config_parse_serial_gateway", test_config_parse_serial_gateway);
+    CU_add_test(suite3,
+                "test_validate_config_without_rules",
+                test_validate_config_without_rules);
 
     CU_pSuite suite4 = CU_add_suite("Trim functions", NULL, NULL);
     CU_add_test(suite4, "test_trim_functions", test_trim_functions);
+
+    CU_pSuite suite5 = CU_add_suite("MQTT parser", NULL, NULL);
+    CU_add_test(suite5,
+                "test_mqtt_format1_slave_override",
+                test_mqtt_format1_slave_override);
+    CU_add_test(suite5,
+                "test_mqtt_format1_no_override",
+                test_mqtt_format1_no_override);
+    CU_add_test(suite5,
+                "test_mqtt_format1_reject_extra_token",
+                test_mqtt_format1_reject_extra_token);
+    CU_add_test(suite5,
+                "test_mqtt_format1_missing_write_payload",
+                test_mqtt_format1_missing_write_payload);
 
     CU_basic_set_mode(CU_BRM_VERBOSE);
     CU_basic_run_tests();

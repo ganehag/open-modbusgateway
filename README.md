@@ -60,6 +60,12 @@ A `controller` publishes a message in the format below on a `request` topic. The
 | REGISTER_COUNT/VALUE | coil/register count or value               | This value depends on the Modbus function: 1, 2, 3, 4 (coil/register count in range [1..125]), 5 (coil value in range [0..1]), 6 (register value in range [0..65535]), 15 (register count in range [1..123]), 16 (register count in range [1..123]). Must not exceed the boundary (first register number + register count <= 65537)                                   |
 | DATA                 | series of coil/register values             | This field only exists for Modbus functions 15 (coil) and 16 (register). A series of coil/register values separated with commas, without spaces (e.g., 0,1,1,0,0,1 or 1,2,3,654,21,789). There must be exactly as many values as specified in register count. Each coil value must be in the range of [0..1]. Each register value must be in the range of [0..65535]. |
 
+`1 <COOKIE> <SERIAL_DEVICE_ID> <TIMEOUT> <SLAVE_ID> <MODBUS_FUNCTION> <REGISTER_NUMBER> <REGISTER_COUNT/VALUE>`
+
+- `SERIAL_DEVICE_ID` maps to a `config serial_gateway` stanza in `openmmg.conf`. The gateway uses that entry to resolve `/dev/tty*`, baudrate, parity, data bits, stop bits, and an optional fixed `slave_id`.
+- Remaining fields mirror the TCP format; register payloads (for functions 15/16) are provided as a trailing comma-separated list just like format `0`.
+- If the referenced serial gateway sets `option slave_id`, the request inherits that value and cannot override it.
+
 
 ### Response message
 
@@ -192,6 +198,26 @@ config rule
   - `slave_id`: The slave ID of the Modbus device.
   - `function`: The function code used for the Modbus communication.
   - `register_address`: The range of register addresses used for the Modbus communication, it should be in the form of 'start-end'.
+- `serial_gateway`: Defines serial Modbus RTU endpoints that MQTT requests can reference. Each entry must provide:
+  - `id`: Identifier used in MQTT payloads (`SERIAL_DEVICE_ID`).
+  - `device`: Serial device path (e.g., `/dev/ttyUSB0`).
+  - `baudrate`: Baud rate for the serial link.
+  - `parity`: `none`, `even`, or `odd`.
+  - `data_bits`: Typically `8`; must be between 5 and 8.
+  - `stop_bits`: `1` or `2`.
+  - `slave_id`: Optional fixed slave ID; when set, requests inherit this value.
+  - Optional `ip`/`port` fields can document the TCP side of a gateway deployment.
+  - `config rule` sections are optional; if none are present the gateway allows TCP requests without additional filtering.
+
+### Integration Test Harness
+
+An end-to-end check that spins up virtual serial ports, a synthetic Modbus RTU slave, and a local Mosquitto broker is available:
+
+```bash
+./test/run_serial_gateway_integration.sh
+```
+
+It requires `socat`, `gcc`, `libmodbus`, and permission to run `mosquitto` on TCP port `18884`. The script will build `src/openmmg` on demand and then verify that a format `1` MQTT request receives the expected Modbus response via the configured `config serial_gateway` stanza.
 
 ## Building the package with OpenWRT
 
