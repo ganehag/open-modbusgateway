@@ -1,4 +1,4 @@
-AC_INIT([modbusgateway],[0.1],[mikael.brorsson@gmail.com])
+AC_INIT([modbusgateway],[0.3.0],[mikael.brorsson@gmail.com])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign subdir-objects])
 
 COMPILER_FLAGS
