@@ -197,6 +197,7 @@ config rule
   - `port`: The port number of the Modbus device. It can be a single number or a range of numbers separated by a '-'.
   - `slave_id`: The slave ID of the Modbus device.
   - `function`: The function code used for the Modbus communication.
+  - `serial_id`: Optional; when provided, the rule applies to Modbus RTU requests that reference the named `config serial_gateway` stanza. Use `*` to match any serial gateway.
   - `register_address`: The range of register addresses used for the Modbus communication, it should be in the form of 'start-end'.
 - `serial_gateway`: Defines serial Modbus RTU endpoints that MQTT requests can reference. Each entry must provide:
   - `id`: Identifier used in MQTT payloads (`SERIAL_DEVICE_ID`).

@@ -67,6 +67,7 @@ typedef struct {
     range_u32_t port[MAX_RANGES];  // Port range,
     uint8_t slave_id; // The max value of a slave id in Modbus is: 247
     uint8_t function; // There are only 17 function codes in Modbus
+    char serial_id[64];
 
     range_u32_t
         register_addr[MAX_RANGES]; // the max value of a modbus register

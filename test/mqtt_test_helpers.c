@@ -18,6 +18,15 @@ static int last_rc = MOSQ_ERR_SUCCESS;
 
 static request_t *captured_request = NULL;
 
+int
+request_thread_reserve(void) {
+    return 1;
+}
+
+void
+request_thread_release(void) {
+}
+
 void
 mqtt_test_reset(void) {
     publish_count = 0;

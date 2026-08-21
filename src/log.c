@@ -30,13 +30,15 @@ FILE *logfile = NULL;
 
 void
 set_logfile(const char *path) {
-    if (logfile != NULL) {
+    if (logfile != NULL && logfile != stderr) {
         fclose(logfile);
     }
 
     logfile = fopen(path, "a");
     if (logfile == NULL) {
         fprintf(stderr, "Failed to open logfile: %s\n", path);
+        logfile = stderr;
+        return;
     }
 
     setbuf(logfile, NULL); // disable buffering

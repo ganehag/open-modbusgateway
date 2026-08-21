@@ -18,6 +18,7 @@
  */
 
 #include <errno.h>
+#include <arpa/inet.h>
 #include <mosquitto.h>
 #include <pthread.h>
 #include <stdbool.h>
@@ -29,6 +30,32 @@
 #include "filters.h"
 #include "log.h"
 #include "mqtt_client.h"
+
+static int
+parse_register_values(char *raw_registers, request_t *req) {
+    char *saveptr = NULL;
+    char *token = strtok_r(raw_registers, ",", &saveptr);
+
+    for (uint16_t i = 0; i < req->register_count; i++) {
+        if (token == NULL || token[0] == '\0') {
+            return -1;
+        }
+
+        char *end = NULL;
+        errno = 0;
+        unsigned long value = strtoul(token, &end, 10);
+        if (errno != 0 || end == token || *end != '\0' ||
+            value > UINT16_MAX ||
+            (req->function == 15 && value > 1)) {
+            return -1;
+        }
+
+        req->data[i] = (uint16_t)value;
+        token = strtok_r(NULL, ",", &saveptr);
+    }
+
+    return token == NULL ? 0 : -1;
+}
 
 void
 mqtt_message_callback(struct mosquitto *mosq,
@@ -52,14 +79,19 @@ mqtt_message_callback(struct mosquitto *mosq,
         return;
     }
 
-    buffer = calloc(message->payloadlen + 1, sizeof(char));
+    if (message == NULL || message->payload == NULL ||
+        message->payloadlen <= 0) {
+        error = MQTT_INVALID_REQUEST;
+        goto cleanup;
+    }
+
+    buffer = calloc((size_t)message->payloadlen + 1, sizeof(char));
     if (buffer == NULL) {
         error = MQTT_ERROR_MESSAGE;
         goto cleanup;
     }
 
-    snprintf(buffer, message->payloadlen + 1, "%s", (char *)message->payload);
-    buffer[message->payloadlen] = '\0';
+    memcpy(buffer, message->payload, (size_t)message->payloadlen);
 
     char raw_registers[1024];
     memset(raw_registers, 0, sizeof(raw_registers));
@@ -209,24 +241,19 @@ mqtt_message_callback(struct mosquitto *mosq,
             error = MQTT_INVALID_REQUEST;
             goto cleanup;
         }
+
+        if (filter_match(config->head, req) != 0) {
+            error = MQTT_MESSAGE_BLOCKED;
+            flog(logfile, "request blocked {%s}\n", buffer);
+            goto cleanup;
+        }
     }
 
-    // Track the pointer to mosq
-    req->mosq = mosq;
-
-    if (buffer != NULL) {
-        free(buffer);
-        buffer = NULL;
-    }
-
-    if (req->register_addr == 0) {
+    if (req->register_addr == 0 || req->register_addr > 65536 ||
+        req->timeout == 0 || req->timeout > 999 || req->slave_id == 0) {
         error = MQTT_INVALID_REQUEST;
         goto cleanup;
     }
-
-    // Change from Register Number to Register Address
-    // Because the request format uses number and libmodbus uses address
-    req->register_addr -= 1;
 
     // Validate inputs common to both formats
     if (req->function != 1 && req->function != 2 && req->function != 3 &&
@@ -237,16 +264,43 @@ mqtt_message_callback(struct mosquitto *mosq,
         goto cleanup;
     }
 
+    if ((req->function >= 1 && req->function <= 4) &&
+        (req->register_count == 0 || req->register_count > 125)) {
+        error = MQTT_INVALID_REQUEST;
+        goto cleanup;
+    }
+
     if ((req->function == 15 || req->function == 16) &&
-        req->register_count > 123) {
+        (req->register_count == 0 || req->register_count > 123)) {
         error = MQTT_INVALID_REQUEST;
         flog(logfile, "overflow register count in request\n");
+        goto cleanup;
+    }
+
+    if (req->function == 5 && req->register_count > 1) {
+        error = MQTT_INVALID_REQUEST;
+        goto cleanup;
+    }
+
+    if ((req->function <= 4 || req->function == 15 || req->function == 16) &&
+        req->register_addr + req->register_count - 1 > 65536) {
+        error = MQTT_INVALID_REQUEST;
         goto cleanup;
     }
 
     if (req->format == 0 && req->ip_type > 2) {
         error = MQTT_INVALID_REQUEST;
         flog(logfile, "invalid IP type in request\n");
+        goto cleanup;
+    }
+
+    if (req->format == 0 &&
+        ((req->ip_type == IP_TYPE_IPV4 &&
+          inet_pton(AF_INET, req->ip, &(struct in_addr){0}) != 1) ||
+         (req->ip_type == IP_TYPE_IPV6 &&
+          inet_pton(AF_INET6, req->ip, &(struct in6_addr){0}) != 1) ||
+         (req->ip_type == IP_TYPE_HOSTNAME && !is_valid_hostname(req->ip)))) {
+        error = MQTT_INVALID_REQUEST;
         goto cleanup;
     }
 
@@ -258,17 +312,8 @@ mqtt_message_callback(struct mosquitto *mosq,
             goto cleanup;
         }
 
-        int read_count = 0;
-        char *token = strtok(raw_registers, ",");
-
-        while (token != NULL && read_count < 123) {
-            req->data[read_count] = atoi(token);
-            token = strtok(NULL, ",");
-            read_count++;
-        }
-
-        if (read_count != req->register_count) {
-            flog(logfile, "invalid number of values supplied\n");
+        if (parse_register_values(raw_registers, req) != 0) {
+            flog(logfile, "invalid register values supplied\n");
             error = MQTT_INVALID_REQUEST;
             goto cleanup;
         }
@@ -286,14 +331,45 @@ mqtt_message_callback(struct mosquitto *mosq,
         }
     }
 
+    // Change from Register Number to Register Address because libmodbus uses
+    // zero-based addresses.
+    req->register_addr -= 1;
+
+    req->mosq = mosq;
+
+    if (buffer != NULL) {
+        free(buffer);
+        buffer = NULL;
+    }
+
     // copy request_topic from config to request
     memset(req->response_topic, 0, sizeof(req->response_topic));
     strncpy(req->response_topic,
             config->response_topic,
             sizeof(req->response_topic));
 
-    // Run the handler as a separate thread
-    pthread_create(&ptid, NULL, &handle_request, req);
+    if (!request_thread_reserve()) {
+        error = MQTT_ERROR_MESSAGE;
+        mqtt_reply_error(mosq,
+                         config->response_topic,
+                         req->cookie,
+                         error,
+                         "Too many requests");
+        free(req);
+        goto done;
+    }
+
+    if (pthread_create(&ptid, NULL, &handle_request, req) != 0) {
+        request_thread_release();
+        error = MQTT_ERROR_MESSAGE;
+        mqtt_reply_error(mosq,
+                         config->response_topic,
+                         req->cookie,
+                         error,
+                         "Unable to start request");
+        free(req);
+        goto done;
+    }
 
     goto done;
 
@@ -315,6 +391,7 @@ done:
 void
 mqtt_connect_callback(struct mosquitto *mosq, void *obj, int result) {
     config_t *config = (config_t *)obj;
+    (void)result;
 
     mosquitto_subscribe(mosq, NULL, config->request_topic, 0);
 }
@@ -375,7 +452,11 @@ mqtt_reply_error(struct mosquitto *mosq,
         break;
     case MQTT_ERROR_MESSAGE:
         snprintf(
-            error_msg, sizeof(error_msg), "%llu ERROR: %s", cookie, str_msg);
+            error_msg,
+            sizeof(error_msg),
+            "%llu ERROR: %s",
+            cookie,
+            str_msg != NULL ? str_msg : "REQUEST FAILED");
         break;
     default:
         snprintf(error_msg, sizeof(error_msg), "%llu ERROR: UNKNOWN", cookie);

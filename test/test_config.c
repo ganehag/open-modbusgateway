@@ -58,6 +58,12 @@ const char file_content_serial_gateway[] = "config serial_gateway\n"
                                            "    option stop_bits '1'\n"
                                            "    option slave_id '3'\n";
 
+const char file_content_serial_rule[] = "config rule\n"
+                                        "    option serial_id 'ttyusb0'\n"
+                                        "    option slave_id '3'\n"
+                                        "    option function '3'\n"
+                                        "    option register_address '0-10'\n";
+
 static void
 config_free_lists(config_t *config) {
     filter_free(&config->head);
@@ -180,6 +186,11 @@ test_config_parse_single_rule(void) {
         // check function code
         CU_ASSERT_EQUAL(current->function_code, 4);
 
+        CU_ASSERT_EQUAL(current->applies_tcp, 1);
+        CU_ASSERT_EQUAL(current->has_ip_range, 1);
+        CU_ASSERT_EQUAL(current->has_port_range, 1);
+        CU_ASSERT_EQUAL(current->applies_serial, 0);
+
         // compare current and expected
         CU_ASSERT_EQUAL(current->port_min, exp_port_reg[i].port.min);
         CU_ASSERT_EQUAL(current->port_max, exp_port_reg[i].port.max);
@@ -223,7 +234,8 @@ test_validate_config_tls_options(void) {
     config.port = 1883;
     strncpy(config.client_id, "test-client", sizeof(config.client_id) - 1);
     strncpy(config.request_topic, "request", sizeof(config.request_topic) - 1);
-    strncpy(config.response_topic, "response", sizeof(config.response_topic) - 1);
+    strncpy(
+        config.response_topic, "response", sizeof(config.response_topic) - 1);
 
     strncpy(config.ca_cert_path, "ca.crt", sizeof(config.ca_cert_path) - 1);
     CU_ASSERT_EQUAL(validate_config(&config), 0);
@@ -294,6 +306,32 @@ test_config_parse_serial_gateway(void) {
 }
 
 void
+test_config_parse_serial_rule(void) {
+    FILE *file = tmpfile();
+    CU_ASSERT_PTR_NOT_NULL_FATAL(file);
+
+    fprintf(file, "%s", file_content_serial_rule);
+    rewind(file);
+
+    config_t config;
+    memset(&config, 0, sizeof(config));
+
+    CU_ASSERT_EQUAL(config_parse_file(file, &config), 0);
+
+    filter_t *rule = config.head;
+    CU_ASSERT_PTR_NOT_NULL(rule);
+    CU_ASSERT_EQUAL(rule->applies_serial, 1);
+    CU_ASSERT_STRING_EQUAL(rule->serial_id, "ttyusb0");
+    CU_ASSERT_EQUAL(rule->applies_tcp, 0);
+    CU_ASSERT_EQUAL(rule->has_port_range, 0);
+    CU_ASSERT_EQUAL(rule->register_address_min, 0);
+    CU_ASSERT_EQUAL(rule->register_address_max, 10);
+
+    config_free_lists(&config);
+    fclose(file);
+}
+
+void
 test_parse_option_range_ok(void) {
     char *range_1 = "1-100";
     range_u32_t list[MAX_RANGES];
@@ -353,7 +391,17 @@ test_parse_option_range_errors(void) {
     // ensure we get an error of PARSE_RANGE_ERROR_MAX_RANGES
     CU_ASSERT_EQUAL(error, PARSE_RANGE_ERROR_MAX_RANGES);
 
-    char *options_invalid_range = "1, 2, 3, 4, 5, 6, 7, 8-9";
+    char options_missing_endpoint[] = "1-";
+    CU_ASSERT_EQUAL(parse_option_range(options_missing_endpoint, list),
+                    PARSE_RANGE_ERROR_INVALID_RANGE);
+
+    char options_extra_endpoint[] = "1-2-3";
+    CU_ASSERT_EQUAL(parse_option_range(options_extra_endpoint, list),
+                    PARSE_RANGE_ERROR_INVALID_RANGE);
+
+    char options_invalid_number[] = "12abc";
+    CU_ASSERT_EQUAL(parse_option_range(options_invalid_number, list),
+                    PARSE_RANGE_ERROR_INVALID_NUMBER);
 }
 
 void

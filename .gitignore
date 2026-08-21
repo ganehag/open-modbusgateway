@@ -1,3 +1,25 @@
 .deps
 src/.deps
 node_modules
+
+# Autotools configure and build outputs
+/Makefile
+/config.h
+/config.log
+/config.status
+/stamp-h1
+/autom4te.cache/
+/src/Makefile
+/src/.dirstamp
+/src/*.o
+/src/openmmg
+/src/openmmg_tests-*.o
+/test/Makefile
+/test/openmmg_tests
+/test/*.o
+/test/*.log
+/test/*.trs
+/test/test-suite.log
+/test/test
+/test-driver
+/modbusgateway-*.tar.*

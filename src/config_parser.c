@@ -28,6 +28,11 @@
 
 uint32_t
 strto_uint32(const char *str, char **endptr, int base) {
+    if (str == NULL || *str == '\0') {
+        errno = EINVAL;
+        return UINT32_MAX;
+    }
+
     errno = 0;
     long value = strtol(str, endptr, base);
     if (errno != 0 || value < 0 || value > UINT32_MAX) {
@@ -239,6 +244,9 @@ config_parse_file(FILE *file, config_t *config) {
                     if (parse_error != 0) {
                         return CONFIG_PARSER_ERROR_INVALID_REGISTER_ADDRESS;
                     }
+                } else if (strncmp(name, "serial_id", 9) == 0) {
+                    strncpy(rule.serial_id, value, sizeof(rule.serial_id));
+                    rule.serial_id[sizeof(rule.serial_id) - 1] = '\0';
                 }
             } else if (in_config_serial_gateway) {
                 if (strncmp(name, "id", 2) == 0) {
@@ -455,18 +463,31 @@ parse_option_range(char *option_value, range_u32_t *list) {
             char *token_min = strtok(token, "-");
             char *token_max = strtok(NULL, "-");
 
+            if (token_min == NULL || token_max == NULL ||
+                strtok(NULL, "-") != NULL) {
+                return PARSE_RANGE_ERROR_INVALID_RANGE;
+            }
+
             errno = 0; // reset errno
-            uint32_t min = strto_uint32(token_min, NULL, 10);
+            char *end = NULL;
+            uint32_t min = strto_uint32(token_min, &end, 10);
             // check of overflow or underflow
             if (errno == ERANGE) {
                 return PARSE_RANGE_ERROR_OVERFLOW;
             }
+            if (errno != 0 || end == token_min || *end != '\0') {
+                return PARSE_RANGE_ERROR_INVALID_RANGE;
+            }
 
             errno = 0; // reset errno
-            uint32_t max = strto_uint32(token_max, NULL, 10);
+            end = NULL;
+            uint32_t max = strto_uint32(token_max, &end, 10);
             // check of overflow or underflow
             if (errno == ERANGE) {
                 return PARSE_RANGE_ERROR_OVERFLOW;
+            }
+            if (errno != 0 || end == token_max || *end != '\0') {
+                return PARSE_RANGE_ERROR_INVALID_RANGE;
             }
 
             // check for errors
@@ -485,10 +506,14 @@ parse_option_range(char *option_value, range_u32_t *list) {
             errno = 0; // reset errno
 
             // token is a single number
-            uint32_t number = strtoul(token, NULL, 10);
+            char *end = NULL;
+            uint32_t number = strto_uint32(token, &end, 10);
 
             // check for errors
-            if (errno != 0) {
+            if (errno == ERANGE) {
+                return PARSE_RANGE_ERROR_OVERFLOW;
+            }
+            if (errno != 0 || end == token || *end != '\0') {
                 return PARSE_RANGE_ERROR_INVALID_NUMBER;
             }
 
@@ -535,32 +560,80 @@ handle_filter_row(config_t *config, rule_t *rule) {
     // since each rule contains multiple port ranges, and multiple register
     // address ranges, we need to add the rule multiple times
 
-    // loop over all the port ranges until we find a rule that is not
-    // initialized
+    int has_ip = (rule->ip[0] != '\0');
+    int has_serial = (rule->serial_id[0] != '\0');
+
+    int port_count = 0;
     for (int i = 0; i < MAX_RANGES; i++) {
         if (rule->port[i].initialized == 0) {
             break;
         }
-        // loop over all the register address ranges until we find a rule that
-        // is not initialized
-        for (int j = 0; j < MAX_RANGES; j++) {
-            if (rule->register_addr[j].initialized == 0) {
-                break;
-            }
+        port_count++;
+    }
 
+    int register_count = 0;
+    for (int i = 0; i < MAX_RANGES; i++) {
+        if (rule->register_addr[i].initialized == 0) {
+            break;
+        }
+        register_count++;
+    }
+
+    if (register_count == 0) {
+        return;
+    }
+
+    if (port_count == 0) {
+        port_count = 1;
+    }
+
+    for (int i = 0; i < port_count; i++) {
+        uint16_t port_min = 0;
+        uint16_t port_max = 0;
+        uint8_t has_port_range = 0;
+
+        if (i < MAX_RANGES && rule->port[i].initialized != 0) {
+            port_min = rule->port[i].min;
+            port_max = rule->port[i].max;
+            has_port_range = 1;
+        }
+
+        for (int j = 0; j < register_count; j++) {
             filter_t *new_filter = calloc(1, sizeof(filter_t));
-            if (ip_cidr_to_in6(rule->ip, &new_filter->iprange) != 0) {
-                return; // unable to parse ip
+            if (new_filter == NULL) {
+                return;
             }
 
             new_filter->slave_id = rule->slave_id;
             new_filter->function_code = rule->function;
-            new_filter->port_min = rule->port[i].min;
-            new_filter->port_max = rule->port[i].max;
             new_filter->register_address_min = rule->register_addr[j].min;
             new_filter->register_address_max = rule->register_addr[j].max;
+            new_filter->port_min = port_min;
+            new_filter->port_max = port_max;
+            new_filter->has_port_range = has_port_range;
 
-            // add the rule to the filter
+            if (has_ip) {
+                new_filter->applies_tcp = 1;
+                new_filter->has_ip_range = 1;
+                if (ip_cidr_to_in6(rule->ip, &new_filter->iprange) != 0) {
+                    free(new_filter);
+                    continue;
+                }
+            }
+
+            if (has_serial) {
+                new_filter->applies_serial = 1;
+                strncpy(new_filter->serial_id,
+                        rule->serial_id,
+                        sizeof(new_filter->serial_id));
+                new_filter->serial_id[sizeof(new_filter->serial_id) - 1] = '\0';
+            }
+
+            if (!new_filter->applies_tcp && !new_filter->applies_serial) {
+                free(new_filter);
+                continue;
+            }
+
             filter_add(&config->head, new_filter);
         }
     }
@@ -672,8 +745,8 @@ validate_config(config_t *config) {
         return -6;
     }
 
-    // ca_cert_path is required whenever any TLS option is set.
-    // cert_path and key_path are optional but must be provided as a pair.
+    // A CA certificate enables server-only TLS. Client credentials are
+    // optional, but must be supplied together and require a CA certificate.
     if (strlen(config->cert_path) > 0 || strlen(config->key_path) > 0) {
         if (strlen(config->ca_cert_path) == 0 ||
             strlen(config->cert_path) == 0 || strlen(config->key_path) == 0) {
