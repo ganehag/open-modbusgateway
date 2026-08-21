@@ -25,6 +25,7 @@ void test_parse_option_range_ok(void);
 void test_config_file_parser_errors(void);
 void test_parse_option_range_errors(void);
 void test_validate_config_without_rules(void);
+void test_validate_config_tls_options(void);
 
 void test_trim_functions(void);
 
