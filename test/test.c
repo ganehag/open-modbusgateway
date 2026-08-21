@@ -36,6 +36,7 @@ int main() {
     CU_add_test(suite3,
                 "test_validate_config_without_rules",
                 test_validate_config_without_rules);
+    CU_add_test(suite3, "test_validate_config_tls_options", test_validate_config_tls_options);
 
     CU_pSuite suite4 = CU_add_suite("Trim functions", NULL, NULL);
     CU_add_test(suite4, "test_trim_functions", test_trim_functions);

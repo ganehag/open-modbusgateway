@@ -215,6 +215,31 @@ test_validate_config_without_rules(void) {
 }
 
 void
+test_validate_config_tls_options(void) {
+    config_t config;
+    memset(&config, 0, sizeof(config));
+
+    strncpy(config.host, "127.0.0.1", sizeof(config.host) - 1);
+    config.port = 1883;
+    strncpy(config.client_id, "test-client", sizeof(config.client_id) - 1);
+    strncpy(config.request_topic, "request", sizeof(config.request_topic) - 1);
+    strncpy(config.response_topic, "response", sizeof(config.response_topic) - 1);
+
+    strncpy(config.ca_cert_path, "ca.crt", sizeof(config.ca_cert_path) - 1);
+    CU_ASSERT_EQUAL(validate_config(&config), 0);
+
+    memset(config.ca_cert_path, 0, sizeof(config.ca_cert_path));
+    strncpy(config.cert_path, "client.crt", sizeof(config.cert_path) - 1);
+    CU_ASSERT_EQUAL(validate_config(&config), -7);
+
+    strncpy(config.ca_cert_path, "ca.crt", sizeof(config.ca_cert_path) - 1);
+    CU_ASSERT_EQUAL(validate_config(&config), -7);
+
+    strncpy(config.key_path, "client.key", sizeof(config.key_path) - 1);
+    CU_ASSERT_EQUAL(validate_config(&config), 0);
+}
+
+void
 test_config_file_parser_errors(void) {
     // create a temporary file
     FILE *file = tmpfile();

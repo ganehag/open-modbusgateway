@@ -672,9 +672,9 @@ validate_config(config_t *config) {
         return -6;
     }
 
-    // if one of the tls options is set, then all of them must be set
-    if (strlen(config->ca_cert_path) > 0 || strlen(config->cert_path) > 0 ||
-        strlen(config->key_path) > 0) {
+    // ca_cert_path is required whenever any TLS option is set.
+    // cert_path and key_path are optional but must be provided as a pair.
+    if (strlen(config->cert_path) > 0 || strlen(config->key_path) > 0) {
         if (strlen(config->ca_cert_path) == 0 ||
             strlen(config->cert_path) == 0 || strlen(config->key_path) == 0) {
             return -7;
