@@ -1,7 +1,6 @@
 AC_INIT([modbusgateway],[0.3.0],[mikael.brorsson@gmail.com])
+AC_CONFIG_SRCDIR([src/main.c])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign subdir-objects])
-
-COMPILER_FLAGS
 
 AC_LANG([C])
 
@@ -16,6 +15,8 @@ fi
 # Check for programs
 AC_PROG_CC
 PKG_PROG_PKG_CONFIG
+PKG_CHECK_MODULES([CUNIT], [cunit >= 2.1.3], dummy=yes,
+  AC_MSG_ERROR("required CUnit >= 2.1.3"))
 
 # libmodbus
 PKG_CHECK_MODULES([MODBUS], [libmodbus >= 3.1.4], dummy=yes,
@@ -39,5 +40,6 @@ AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([
   Makefile
   src/Makefile
+  test/Makefile
 ])
 AC_OUTPUT
