@@ -231,11 +231,42 @@ config automation
 ```
 
 Lua 5.1 through 5.4 are supported. Define only the callbacks your deployment
-uses; `on_mqtt_connected(event)` and `on_mqtt_disconnected(event)` receive an
-event table with `name`, `timestamp_ms`, and, for disconnects, `reason`.
-Scripts have access to `gateway.log(message)` only. The `io`, `os`, `package`,
-and `debug` libraries are not loaded, dynamic script loading is disabled, and
-each callback has a fixed instruction budget. See
+uses. Passive lifecycle hooks are `on_gateway_started`, `on_gateway_stopping`,
+`on_mqtt_connected`, `on_mqtt_disconnected`, `on_request_accepted`,
+`on_request_rejected`, `on_modbus_succeeded`, `on_modbus_failed`, and
+`on_timer` (at most once per second).
+
+Request hooks form a synchronous pipeline:
+
+```text
+on_before_request
+on_before_read | on_before_write
+on_before_read_coils | on_before_read_discrete_inputs |
+on_before_read_registers | on_before_read_input_registers |
+on_before_write_coil | on_before_write_register |
+on_before_write_coils | on_before_write_registers
+Modbus operation
+on_after_request
+on_after_read | on_after_write
+on_after_read_coils | on_after_read_discrete_inputs |
+on_after_read_registers | on_after_read_input_registers |
+on_after_write_coil | on_after_write_register |
+on_after_write_coils | on_after_write_registers
+```
+
+Before hooks receive a request table. They may change its `address`, `count`,
+and (for reads and multi-value writes) `values`, or return `false, "reason"`
+to reject it. Endpoint, unit ID, function, and cookie remain gateway-controlled.
+The changed request is checked again against the configured filters. After hooks
+receive the completed request; for reads, edits to `response.values` are
+reflected in the MQTT response.
+
+Before hooks can also call `gateway.read_registers(address, count)` and
+`gateway.write_registers(address, values)` for auxiliary work on the same
+target. These calls are subject to the same Modbus timeout and filters, and
+return `nil, error` on failure. Scripts also have `gateway.log(message)`. The
+`io`, `os`, `package`, and `debug` libraries are not loaded, dynamic script
+loading is disabled, and each callback has a fixed instruction budget. See
 `examples/automation.lua.example` for a complete starting point.
 
 ## Building the package with OpenWRT

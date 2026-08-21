@@ -20,8 +20,8 @@ openmmg_tests_SOURCES = \
     $(top_srcdir)/src/automation.c \
     test_automation.c
 
-openmmg_tests_CFLAGS = $(CUNIT_CFLAGS) $(LUA_CFLAGS)
-openmmg_tests_LDADD = $(CUNIT_LIBS) $(LUA_LIBS)
+openmmg_tests_CFLAGS = $(CUNIT_CFLAGS) $(LUA_CFLAGS) $(MODBUS_CFLAGS)
+openmmg_tests_LDADD = $(CUNIT_LIBS) $(LUA_LIBS) $(MODBUS_LIBS)
 
 .PHONY: run integration-check
 

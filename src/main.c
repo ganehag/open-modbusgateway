@@ -248,6 +248,7 @@ main(int argc, char *argv[]) {
     }
 
     flog(logfile, "starting Open MQTT Modbus Gateway\n");
+    automation_emit_gateway_started();
 
     // Initialize the mosquitto library
     mosquitto_lib_init();
@@ -329,7 +330,9 @@ main(int argc, char *argv[]) {
 
         // Start the main loop
         while (run) {
-            rc = mosquitto_loop(mosq, -1, 1);
+            rc = mosquitto_loop(mosq, 1000, 1);
+            automation_dispatch_pending();
+            automation_emit_timer();
             if (run && rc) {
                 flog(logfile, "connection error: %s\n", mosquitto_strerror(rc));
                 automation_emit_mqtt_disconnected(mosquitto_strerror(rc));
@@ -342,6 +345,7 @@ main(int argc, char *argv[]) {
     }
 
     mosquitto_lib_cleanup();
+    automation_emit_gateway_stopping();
     automation_shutdown();
 
     // close log file

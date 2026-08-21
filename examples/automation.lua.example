@@ -8,3 +8,26 @@ end
 function on_mqtt_disconnected(event)
     gateway.log("MQTT disconnected: " .. event.reason)
 end
+
+-- Before hooks run synchronously. They may update address, count, and values,
+-- or return false with a reason to reject the request.
+function on_before_read_registers(request)
+    -- Example: map public register 1 to the device's register 100.
+    -- request.address = 100
+end
+
+function on_before_write_registers(request)
+    if request.values[1] and request.values[1] > 1000 then
+        return false, "value exceeds the permitted limit"
+    end
+
+    -- Auxiliary calls use the same configured target and still obey filters.
+    -- local values, err = gateway.read_registers(200, 1)
+    -- assert(values, err)
+    -- assert(gateway.write_registers(201, { values[1] }))
+end
+
+-- After hooks can transform read values before the MQTT reply is published.
+function on_after_read_registers(response)
+    -- response.values[1] = response.values[1] * 10
+end

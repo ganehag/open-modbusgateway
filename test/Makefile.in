@@ -117,7 +117,7 @@ am_openmmg_tests_OBJECTS = openmmg_tests-mqtt_test_helpers.$(OBJEXT) \
 openmmg_tests_OBJECTS = $(am_openmmg_tests_OBJECTS)
 am__DEPENDENCIES_1 =
 openmmg_tests_DEPENDENCIES = $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 openmmg_tests_LINK = $(CCLD) $(openmmg_tests_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
 AM_V_P = $(am__v_P_@AM_V@)
@@ -525,8 +525,8 @@ openmmg_tests_SOURCES = \
     $(top_srcdir)/src/automation.c \
     test_automation.c
 
-openmmg_tests_CFLAGS = $(CUNIT_CFLAGS) $(LUA_CFLAGS)
-openmmg_tests_LDADD = $(CUNIT_LIBS) $(LUA_LIBS)
+openmmg_tests_CFLAGS = $(CUNIT_CFLAGS) $(LUA_CFLAGS) $(MODBUS_CFLAGS)
+openmmg_tests_LDADD = $(CUNIT_LIBS) $(LUA_LIBS) $(MODBUS_LIBS)
 all: all-am
 
 .SUFFIXES:

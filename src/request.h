@@ -19,7 +19,7 @@ typedef struct {
     uint8_t function;
     uint32_t register_addr;
     uint16_t register_count;
-    uint16_t data[123];
+    uint16_t data[125];
     char serial_device[128];
     int serial_baud;
     char serial_parity;
