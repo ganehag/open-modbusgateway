@@ -269,7 +269,8 @@ be passed to `gateway.write_registers_to(target, address, values)` from a timer
 or lifecycle callback. These calls are subject to the same Modbus timeout and
 filters, and return `nil, error` on failure. Scripts also have `gateway.log(message)`. The
 `io`, `os`, `package`, and `debug` libraries are not loaded, dynamic script
-loading is disabled, and each callback has a fixed instruction budget. See
+loading is disabled, and each callback has a fixed instruction budget and a
+1 MiB Lua memory limit. See
 `examples/automation.lua.example` for a complete starting point.
 
 ## Building the package with OpenWRT

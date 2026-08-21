@@ -17,12 +17,17 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <errno.h>
 #include <modbus/modbus.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "automation.h"
 #include "log.h"
@@ -31,6 +36,7 @@
 
 uint16_t request_count = 0;
 pthread_mutex_t request_count_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t request_count_cond = PTHREAD_COND_INITIALIZER;
 
 int
 request_thread_reserve(void) {
@@ -52,7 +58,34 @@ request_thread_release(void) {
     if (request_count > 0) {
         request_count--;
     }
+    if (request_count == 0) {
+        pthread_cond_broadcast(&request_count_cond);
+    }
     pthread_mutex_unlock(&request_count_mutex);
+}
+
+int
+request_wait_for_completion(unsigned int timeout_ms) {
+    struct timespec deadline;
+    clock_gettime(CLOCK_REALTIME, &deadline);
+    deadline.tv_sec += timeout_ms / 1000;
+    deadline.tv_nsec += (long)(timeout_ms % 1000) * 1000000L;
+    if (deadline.tv_nsec >= 1000000000L) {
+        deadline.tv_sec++;
+        deadline.tv_nsec -= 1000000000L;
+    }
+
+    pthread_mutex_lock(&request_count_mutex);
+    while (request_count > 0) {
+        int result = pthread_cond_timedwait(
+            &request_count_cond, &request_count_mutex, &deadline);
+        if (result == ETIMEDOUT) {
+            pthread_mutex_unlock(&request_count_mutex);
+            return -1;
+        }
+    }
+    pthread_mutex_unlock(&request_count_mutex);
+    return 0;
 }
 
 char *

@@ -10,6 +10,7 @@
 #include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
@@ -19,12 +20,14 @@
 #include "mqtt_client.h"
 
 #define AUTOMATION_INSTRUCTION_LIMIT 100000
+#define AUTOMATION_MEMORY_LIMIT (1024U * 1024U)
 #define AUTOMATION_HOOK_INTERVAL 1000
 #define AUTOMATION_QUEUE_CAPACITY 64
 #define AUTOMATION_TARGET_CAPACITY 64
 
 static lua_State *automation_state;
 static int instruction_budget;
+static size_t automation_memory_used;
 static int64_t last_timer_ms;
 static const config_t *active_config;
 static const request_t *active_request;
@@ -78,6 +81,28 @@ automation_now_ms(void) {
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
     return (int64_t)now.tv_sec * 1000 + now.tv_nsec / 1000000;
+}
+
+static void *
+automation_lua_alloc(void *userdata,
+                     void *pointer,
+                     size_t old_size,
+                     size_t new_size) {
+    size_t *used = userdata;
+    if (new_size == 0) {
+        free(pointer);
+        *used -= old_size;
+        return NULL;
+    }
+    if (new_size > old_size &&
+        new_size - old_size > AUTOMATION_MEMORY_LIMIT - *used) {
+        return NULL;
+    }
+    void *result = realloc(pointer, new_size);
+    if (result != NULL) {
+        *used = *used - old_size + new_size;
+    }
+    return result;
 }
 
 static unsigned int
@@ -639,7 +664,9 @@ automation_init(const char *script_path) {
         return 0;
     }
 
-    automation_state = luaL_newstate();
+    automation_memory_used = 0;
+    automation_state =
+        lua_newstate(automation_lua_alloc, &automation_memory_used);
     if (automation_state == NULL) {
         return -1;
     }
@@ -696,6 +723,7 @@ automation_shutdown(void) {
         lua_close(automation_state);
         automation_state = NULL;
     }
+    automation_memory_used = 0;
     automation_config = NULL;
 }
 

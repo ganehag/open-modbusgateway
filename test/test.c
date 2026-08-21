@@ -92,6 +92,8 @@ main() {
                 "test_automation_instruction_limit",
                 test_automation_instruction_limit);
     CU_add_test(
+        suite6, "test_automation_memory_limit", test_automation_memory_limit);
+    CU_add_test(
         suite6, "test_automation_request_hooks", test_automation_request_hooks);
 
     CU_basic_set_mode(CU_BRM_VERBOSE);

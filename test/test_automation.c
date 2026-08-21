@@ -76,6 +76,23 @@ test_automation_instruction_limit(void) {
 }
 
 void
+test_automation_memory_limit(void) {
+    set_logfile("/dev/null");
+    char *path =
+        write_script("function on_mqtt_connected(event)\n"
+                     "  local value = string.rep('x', 2 * 1024 * 1024)\n"
+                     "end\n");
+    CU_ASSERT_PTR_NOT_NULL_FATAL(path);
+
+    CU_ASSERT_EQUAL(automation_init(path), 0);
+    CU_ASSERT_NOT_EQUAL(automation_emit_mqtt_connected(), 0);
+    automation_shutdown();
+
+    unlink(path);
+    free(path);
+}
+
+void
 test_automation_request_hooks(void) {
     set_logfile("/dev/null");
     char *path = write_script(

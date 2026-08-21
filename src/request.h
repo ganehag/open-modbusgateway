@@ -46,5 +46,6 @@ join_regs_str(const uint16_t datalen, const uint16_t *data, const char *sep);
 void *handle_request(void *arg);
 int request_thread_reserve(void);
 void request_thread_release(void);
+int request_wait_for_completion(unsigned int timeout_ms);
 
 #endif

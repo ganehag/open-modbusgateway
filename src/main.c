@@ -138,7 +138,7 @@ main(int argc, char *argv[]) {
     memset(&config, 0, sizeof(config_t));
 
     int rc = 0;
-    struct mosquitto *mosq;
+    struct mosquitto *mosq = NULL;
 
     // Handle signals
     signal(SIGINT, handle_signal);
@@ -345,10 +345,16 @@ main(int argc, char *argv[]) {
                 mosquitto_reconnect(mosq);
             }
         }
-    terminate:
-        mosquitto_destroy(mosq);
+    terminate:;
     }
 
+    if (request_wait_for_completion(5000) != 0) {
+        flog(logfile, "timed out waiting for active Modbus requests\n");
+    }
+    automation_dispatch_pending();
+    if (mosq != NULL) {
+        mosquitto_destroy(mosq);
+    }
     mosquitto_lib_cleanup();
     automation_emit_gateway_stopping();
     automation_shutdown();

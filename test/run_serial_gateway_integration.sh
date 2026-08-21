@@ -53,6 +53,28 @@ CLEANUP_CMDS+=("kill $MOSQUITTO_PID >/dev/null 2>&1 || true")
 sleep 1
 
 CONF_FILE="$TMPDIR/openmmg.conf"
+AUTOMATION_SCRIPT="$TMPDIR/automation.lua"
+cat > "$AUTOMATION_SCRIPT" <<'EOF'
+local watched_register = 1
+local last_write_ms
+local reset_target
+
+function on_modbus_succeeded(event)
+    if event.function_code == 16 and event.register_address == watched_register then
+        last_write_ms = event.timestamp_ms
+        reset_target = event.target
+    end
+end
+
+function on_timer(event)
+    if not reset_target or not last_write_ms
+       or event.timestamp_ms - last_write_ms < 1000 then
+        return
+    end
+    last_write_ms = nil
+    assert(gateway.write_registers_to(reset_target, watched_register, { 0 }))
+end
+EOF
 cat > "$CONF_FILE" <<EOF
 config mqtt
     option host '127.0.0.1'
@@ -61,7 +83,7 @@ config mqtt
     option response_topic 'response'
 
 config automation
-    option script '$ROOT_DIR/examples/automation.lua.example'
+    option script '$AUTOMATION_SCRIPT'
 
 config serial_gateway
     option id '$SERIAL_ID'
@@ -76,6 +98,12 @@ config rule
     option serial_id '$SERIAL_ID'
     option slave_id '3'
     option function '3'
+    option register_address '1-10'
+
+config rule
+    option serial_id '$SERIAL_ID'
+    option slave_id '3'
+    option function '16'
     option register_address '1-10'
 EOF
 
@@ -124,6 +152,36 @@ if [[ "$RESPONSE" != "$EXPECTED" ]]; then
 fi
 
 echo "[INFO] Integration test passed: $RESPONSE"
+
+RESET_WRITE_COOKIE=123456791
+RESET_WRITE_FILE="$TMPDIR/reset_write.txt"
+timeout 20 mosquitto_sub -h 127.0.0.1 -p "$PORT" -t response -C 1 \
+    > "$RESET_WRITE_FILE" &
+RESET_WRITE_SUB_PID=$!
+CLEANUP_CMDS+=("kill $RESET_WRITE_SUB_PID >/dev/null 2>&1 || true")
+sleep 1
+echo "[INFO] Verifying automation resets an inactive register"
+mosquitto_pub -h 127.0.0.1 -p "$PORT" -t request \
+    -m "1 $RESET_WRITE_COOKIE $SERIAL_ID 5 3 16 1 1 55"
+wait "$RESET_WRITE_SUB_PID"
+
+sleep 3
+RESET_READ_COOKIE=123456792
+RESET_READ_FILE="$TMPDIR/reset_read.txt"
+timeout 20 mosquitto_sub -h 127.0.0.1 -p "$PORT" -t response -C 1 \
+    > "$RESET_READ_FILE" &
+RESET_READ_SUB_PID=$!
+CLEANUP_CMDS+=("kill $RESET_READ_SUB_PID >/dev/null 2>&1 || true")
+sleep 1
+mosquitto_pub -h 127.0.0.1 -p "$PORT" -t request \
+    -m "1 $RESET_READ_COOKIE $SERIAL_ID 5 3 3 1 1"
+wait "$RESET_READ_SUB_PID"
+RESET_RESPONSE="$(cat "$RESET_READ_FILE")"
+if [[ "$RESET_RESPONSE" != "$RESET_READ_COOKIE OK 0" ]]; then
+    echo "[ERROR] Inactivity reset failed: '$RESET_RESPONSE'"
+    exit 1
+fi
+echo "[INFO] Automation reset integration test passed: $RESET_RESPONSE"
 
 BLOCKED_COOKIE=123456790
 BLOCKED_RESPONSE_FILE="$TMPDIR/blocked_response.txt"
