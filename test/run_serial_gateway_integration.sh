@@ -70,11 +70,10 @@ config serial_gateway
     option slave_id '3'
 
 config rule
-    option ip '::ffff:127.0.0.1/128'
-    option port '1502'
-    option slave_id '1'
+    option serial_id '$SERIAL_ID'
+    option slave_id '3'
     option function '3'
-    option register_address '0-10'
+    option register_address '1-10'
 EOF
 
 echo "[INFO] Starting openmmg with config $CONF_FILE"
@@ -122,3 +121,30 @@ if [[ "$RESPONSE" != "$EXPECTED" ]]; then
 fi
 
 echo "[INFO] Integration test passed: $RESPONSE"
+
+BLOCKED_COOKIE=123456790
+BLOCKED_RESPONSE_FILE="$TMPDIR/blocked_response.txt"
+echo "[INFO] Verifying serial filter blocks an out-of-range request"
+timeout 20 mosquitto_sub -h 127.0.0.1 -p "$PORT" -t response -C 1 \
+    > "$BLOCKED_RESPONSE_FILE" &
+BLOCKED_SUB_PID=$!
+CLEANUP_CMDS+=("kill $BLOCKED_SUB_PID >/dev/null 2>&1 || true")
+sleep 1
+
+BLOCKED_REQUEST="1 $BLOCKED_COOKIE $SERIAL_ID 5 3 3 11 1"
+mosquitto_pub -h 127.0.0.1 -p "$PORT" -t request -m "$BLOCKED_REQUEST"
+
+if ! wait "$BLOCKED_SUB_PID"; then
+    echo "[ERROR] Timed out waiting for blocked-request response."
+    exit 1
+fi
+
+BLOCKED_RESPONSE="$(cat "$BLOCKED_RESPONSE_FILE")"
+EXPECTED_BLOCKED_RESPONSE="$BLOCKED_COOKIE ERROR: MESSAGE BLOCKED"
+
+if [[ "$BLOCKED_RESPONSE" != "$EXPECTED_BLOCKED_RESPONSE" ]]; then
+    echo "[ERROR] Unexpected blocked response: '$BLOCKED_RESPONSE' (expected '$EXPECTED_BLOCKED_RESPONSE')"
+    exit 1
+fi
+
+echo "[INFO] Serial filter integration test passed: $BLOCKED_RESPONSE"

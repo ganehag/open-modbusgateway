@@ -39,5 +39,6 @@ void test_mqtt_format1_serial_filter_blocks(void);
 void test_mqtt_format1_serial_filter_allows(void);
 void test_mqtt_rejects_invalid_write_values(void);
 void test_mqtt_accepts_non_terminated_payload(void);
+void test_mqtt_rejects_invalid_tcp_address(void);
 
 #endif

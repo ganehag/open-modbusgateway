@@ -18,6 +18,7 @@
  */
 
 #include <errno.h>
+#include <arpa/inet.h>
 #include <mosquitto.h>
 #include <pthread.h>
 #include <stdbool.h>
@@ -290,6 +291,16 @@ mqtt_message_callback(struct mosquitto *mosq,
     if (req->format == 0 && req->ip_type > 2) {
         error = MQTT_INVALID_REQUEST;
         flog(logfile, "invalid IP type in request\n");
+        goto cleanup;
+    }
+
+    if (req->format == 0 &&
+        ((req->ip_type == IP_TYPE_IPV4 &&
+          inet_pton(AF_INET, req->ip, &(struct in_addr){0}) != 1) ||
+         (req->ip_type == IP_TYPE_IPV6 &&
+          inet_pton(AF_INET6, req->ip, &(struct in6_addr){0}) != 1) ||
+         (req->ip_type == IP_TYPE_HOSTNAME && !is_valid_hostname(req->ip)))) {
+        error = MQTT_INVALID_REQUEST;
         goto cleanup;
     }
 

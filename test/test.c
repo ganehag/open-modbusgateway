@@ -70,6 +70,9 @@ int main() {
     CU_add_test(suite5,
                 "test_mqtt_accepts_non_terminated_payload",
                 test_mqtt_accepts_non_terminated_payload);
+    CU_add_test(suite5,
+                "test_mqtt_rejects_invalid_tcp_address",
+                test_mqtt_rejects_invalid_tcp_address);
 
     CU_basic_set_mode(CU_BRM_VERBOSE);
     CU_basic_run_tests();

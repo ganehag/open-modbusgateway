@@ -126,7 +126,7 @@ filter_match_one(filter_t *filter, request_t *request) {
 
 static int
 filter_match_tcp(filter_t *filter, request_t *request) {
-    char ip[INET6_ADDRSTRLEN];
+    char ip[sizeof("::ffff:") + sizeof(request->ip)];
     memset(ip, 0, sizeof(ip));
 
     if (filter->has_ip_range) {

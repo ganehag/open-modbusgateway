@@ -263,3 +263,21 @@ test_mqtt_accepts_non_terminated_payload(void) {
     free(captured);
     mqtt_test_release_captured_request();
 }
+
+void
+test_mqtt_rejects_invalid_tcp_address(void) {
+    silence_logs();
+    mqtt_test_reset();
+
+    config_t config;
+    serial_gateway_t gateway;
+    setup_basic_config(&config, &gateway);
+
+    const char *payload = "0 904 0 not-an-ip 502 5 7 3 30 2";
+    struct mosquitto_message msg = make_message(payload);
+    mqtt_message_callback(NULL, &config, &msg);
+
+    CU_ASSERT_PTR_NULL(mqtt_test_captured_request());
+    CU_ASSERT_PTR_NOT_NULL(
+        strstr(mqtt_test_last_payload(), "904 ERROR: INVALID REQUEST"));
+}
