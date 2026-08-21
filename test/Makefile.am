@@ -16,10 +16,12 @@ openmmg_tests_SOURCES = \
     $(top_srcdir)/src/filters.c \
     $(top_srcdir)/src/iprange.c \
     $(top_srcdir)/src/log.c \
-    $(top_srcdir)/src/mqtt_client.c
+    $(top_srcdir)/src/mqtt_client.c \
+    $(top_srcdir)/src/automation.c \
+    test_automation.c
 
-openmmg_tests_CFLAGS = $(CUNIT_CFLAGS)
-openmmg_tests_LDADD = $(CUNIT_LIBS)
+openmmg_tests_CFLAGS = $(CUNIT_CFLAGS) $(LUA_CFLAGS)
+openmmg_tests_LDADD = $(CUNIT_LIBS) $(LUA_LIBS)
 
 .PHONY: run integration-check
 

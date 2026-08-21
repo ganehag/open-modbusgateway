@@ -17,6 +17,22 @@ AC_PROG_CC
 PKG_PROG_PKG_CONFIG
 PKG_CHECK_MODULES([CUNIT], [cunit >= 2.1.3], dummy=yes,
   AC_MSG_ERROR("required CUnit >= 2.1.3"))
+AC_MSG_CHECKING([for Lua 5.1 through 5.4])
+lua_pkg=""
+for candidate in lua5.4 lua5.3 lua5.2 lua5.1; do
+  if $PKG_CONFIG --exists "$candidate"; then
+    lua_pkg="$candidate"
+    break
+  fi
+done
+if test -z "$lua_pkg"; then
+  AC_MSG_FAILURE([Lua 5.1, 5.2, 5.3, or 5.4 is required])
+fi
+LUA_CFLAGS=`$PKG_CONFIG --cflags "$lua_pkg"`
+LUA_LIBS=`$PKG_CONFIG --libs "$lua_pkg"`
+AC_SUBST([LUA_CFLAGS])
+AC_SUBST([LUA_LIBS])
+AC_MSG_RESULT([$lua_pkg])
 
 # libmodbus
 PKG_CHECK_MODULES([MODBUS], [libmodbus >= 3.1.4], dummy=yes,

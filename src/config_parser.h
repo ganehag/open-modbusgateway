@@ -107,6 +107,8 @@ typedef struct {
     char request_topic[1024];
     char response_topic[1024];
 
+    char automation_script[256];
+
     // filter
     filter_t *head;
     serial_gateway_t *serial_head;

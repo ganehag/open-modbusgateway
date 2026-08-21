@@ -4,6 +4,9 @@ config mqtt
 	option request_topic 'request'
 	option response_topic 'response'
 
+# config automation
+# 	option script '/etc/openmmg/automation.lua'
+
 config serial_gateway
 	option id 'ttyusb0'
 	option device '/dev/ttyUSB0'

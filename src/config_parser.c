@@ -121,6 +121,7 @@ config_parse_file(FILE *file, config_t *config) {
     int in_config_rule = 0;
     int in_config_mqtt = 0;
     int in_config_serial_gateway = 0;
+    int in_config_automation = 0;
 
     int line_number = -1; // -1 because of the first line, which will increment
                           // line_number to 0
@@ -157,6 +158,12 @@ config_parse_file(FILE *file, config_t *config) {
             continue;
         }
 
+        if (strncmp(line, "config automation", 17) == 0) {
+            in_config_automation = 1;
+            in_config = 1;
+            continue;
+        }
+
         // check for end of config rule
         if (in_config_rule && line[0] == '\0') {
             handle_filter_row(config, &rule);
@@ -188,6 +195,12 @@ config_parse_file(FILE *file, config_t *config) {
         // check for end of config mqtt
         if (in_config_mqtt && line[0] == '\0') {
             in_config_mqtt = 0;
+            in_config = 0;
+            continue;
+        }
+
+        if (in_config_automation && line[0] == '\0') {
+            in_config_automation = 0;
             in_config = 0;
             continue;
         }
@@ -303,6 +316,12 @@ config_parse_file(FILE *file, config_t *config) {
                         return CONFIG_PARSER_ERROR_INVALID_SERIAL_GATEWAY;
                     }
                     serial_gateway.slave_id = (uint8_t)parsed_slave;
+                }
+            } else if (in_config_automation) {
+                if (strncmp(name, "script", 6) == 0) {
+                    strncpy(config->automation_script,
+                            value,
+                            sizeof(config->automation_script) - 1);
                 }
             } else if (in_config_mqtt) {
                 // MQTT config options

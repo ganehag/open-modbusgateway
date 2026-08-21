@@ -106,7 +106,8 @@ PROGRAMS = $(bin_PROGRAMS)
 am_openmmg_OBJECTS = openmmg-config_parser.$(OBJEXT) \
 	openmmg-filters.$(OBJEXT) openmmg-iprange.$(OBJEXT) \
 	openmmg-main.$(OBJEXT) openmmg-request.$(OBJEXT) \
-	openmmg-log.$(OBJEXT) openmmg-mqtt_client.$(OBJEXT)
+	openmmg-log.$(OBJEXT) openmmg-mqtt_client.$(OBJEXT) \
+	openmmg-automation.$(OBJEXT)
 openmmg_OBJECTS = $(am_openmmg_OBJECTS)
 openmmg_DEPENDENCIES =
 openmmg_LINK = $(CCLD) $(openmmg_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
@@ -126,7 +127,8 @@ am__v_at_1 =
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__maybe_remake_depfiles = depfiles
-am__depfiles_remade = ./$(DEPDIR)/openmmg-config_parser.Po \
+am__depfiles_remade = ./$(DEPDIR)/openmmg-automation.Po \
+	./$(DEPDIR)/openmmg-config_parser.Po \
 	./$(DEPDIR)/openmmg-filters.Po ./$(DEPDIR)/openmmg-iprange.Po \
 	./$(DEPDIR)/openmmg-log.Po ./$(DEPDIR)/openmmg-main.Po \
 	./$(DEPDIR)/openmmg-mqtt_client.Po \
@@ -207,6 +209,8 @@ LDFLAGS = @LDFLAGS@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
 LTLIBOBJS = @LTLIBOBJS@
+LUA_CFLAGS = @LUA_CFLAGS@
+LUA_LIBS = @LUA_LIBS@
 MAKEINFO = @MAKEINFO@
 MKDIR_P = @MKDIR_P@
 MODBUS_CFLAGS = @MODBUS_CFLAGS@
@@ -277,12 +281,12 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AM_CPPFLAGS = -I$(srcdir)
-openmmg_SOURCES = config_parser.c filters.c iprange.c main.c request.c log.c mqtt_client.c
-noinst_HEADERS = config_parser.h filters.h iprange.h log.h mqtt_client.h request.h
+openmmg_SOURCES = config_parser.c filters.c iprange.c main.c request.c log.c mqtt_client.c automation.c
+noinst_HEADERS = config_parser.h filters.h iprange.h log.h mqtt_client.h request.h automation.h
 
 # mosquitto, modbus, pthread and libconfig
-openmmg_CFLAGS = @MOSQUITTO_CFLAGS@ @MODBUS_CFLAGS@
-openmmg_LDADD = @MOSQUITTO_LIBS@ @MOSQUITTO_LDFLAGS@ @MODBUS_LIBS@ @MODBUS_LDFLAGS@ -lpthread
+openmmg_CFLAGS = @MOSQUITTO_CFLAGS@ @MODBUS_CFLAGS@ @LUA_CFLAGS@
+openmmg_LDADD = @MOSQUITTO_LIBS@ @MOSQUITTO_LDFLAGS@ @MODBUS_LIBS@ @MODBUS_LDFLAGS@ @LUA_LIBS@ -lpthread
 AM_LDFLAGS = -s
 AM_CFLAGS = $(CFLAGS)
 all: all-am
@@ -371,6 +375,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/openmmg-automation.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/openmmg-config_parser.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/openmmg-filters.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/openmmg-iprange.Po@am__quote@ # am--include-marker
@@ -499,6 +504,20 @@ openmmg-mqtt_client.obj: mqtt_client.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openmmg_CFLAGS) $(CFLAGS) -c -o openmmg-mqtt_client.obj `if test -f 'mqtt_client.c'; then $(CYGPATH_W) 'mqtt_client.c'; else $(CYGPATH_W) '$(srcdir)/mqtt_client.c'; fi`
 
+openmmg-automation.o: automation.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openmmg_CFLAGS) $(CFLAGS) -MT openmmg-automation.o -MD -MP -MF $(DEPDIR)/openmmg-automation.Tpo -c -o openmmg-automation.o `test -f 'automation.c' || echo '$(srcdir)/'`automation.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/openmmg-automation.Tpo $(DEPDIR)/openmmg-automation.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='automation.c' object='openmmg-automation.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openmmg_CFLAGS) $(CFLAGS) -c -o openmmg-automation.o `test -f 'automation.c' || echo '$(srcdir)/'`automation.c
+
+openmmg-automation.obj: automation.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openmmg_CFLAGS) $(CFLAGS) -MT openmmg-automation.obj -MD -MP -MF $(DEPDIR)/openmmg-automation.Tpo -c -o openmmg-automation.obj `if test -f 'automation.c'; then $(CYGPATH_W) 'automation.c'; else $(CYGPATH_W) '$(srcdir)/automation.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/openmmg-automation.Tpo $(DEPDIR)/openmmg-automation.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='automation.c' object='openmmg-automation.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openmmg_CFLAGS) $(CFLAGS) -c -o openmmg-automation.obj `if test -f 'automation.c'; then $(CYGPATH_W) 'automation.c'; else $(CYGPATH_W) '$(srcdir)/automation.c'; fi`
+
 ID: $(am__tagged_files)
 	$(am__define_uniq_tagged_files); mkid -fID $$unique
 tags: tags-am
@@ -625,6 +644,7 @@ clean: clean-am
 clean-am: clean-binPROGRAMS clean-generic mostlyclean-am
 
 distclean: distclean-am
+	-rm -f ./$(DEPDIR)/openmmg-automation.Po
 	-rm -f ./$(DEPDIR)/openmmg-config_parser.Po
 	-rm -f ./$(DEPDIR)/openmmg-filters.Po
 	-rm -f ./$(DEPDIR)/openmmg-iprange.Po
@@ -677,6 +697,7 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-am
+	-rm -f ./$(DEPDIR)/openmmg-automation.Po
 	-rm -f ./$(DEPDIR)/openmmg-config_parser.Po
 	-rm -f ./$(DEPDIR)/openmmg-filters.Po
 	-rm -f ./$(DEPDIR)/openmmg-iprange.Po

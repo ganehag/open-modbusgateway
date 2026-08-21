@@ -220,6 +220,24 @@ An end-to-end check that spins up virtual serial ports, a synthetic Modbus RTU s
 
 It requires `socat`, `gcc`, `libmodbus`, and permission to run `mosquitto` on TCP port `18884`. The script will build `src/openmmg` on demand and then verify that a format `1` MQTT request receives the expected Modbus response via the configured `config serial_gateway` stanza.
 
+### Lua automation
+
+An optional `config automation` stanza loads one Lua script when the gateway
+starts:
+
+```text
+config automation
+	option script '/etc/openmmg/automation.lua'
+```
+
+Lua 5.1 through 5.4 are supported. Define only the callbacks your deployment
+uses; `on_mqtt_connected(event)` and `on_mqtt_disconnected(event)` receive an
+event table with `name`, `timestamp_ms`, and, for disconnects, `reason`.
+Scripts have access to `gateway.log(message)` only. The `io`, `os`, `package`,
+and `debug` libraries are not loaded, dynamic script loading is disabled, and
+each callback has a fixed instruction budget. See
+`examples/automation.lua.example` for a complete starting point.
+
 ## Building the package with OpenWRT
 
 For detailed instructions on building a single package for OpenWRT, refer to the [OpenWRT documentation](https://openwrt.org/docs/guide-developer/toolchain/single.package).

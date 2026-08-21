@@ -651,6 +651,8 @@ MOSQUITTO_CFLAGS
 MODBUS_LDFLAGS
 MODBUS_LIBS
 MODBUS_CFLAGS
+LUA_LIBS
+LUA_CFLAGS
 CUNIT_LIBS
 CUNIT_CFLAGS
 PKG_CONFIG_LIBDIR
@@ -4648,6 +4650,27 @@ else
 printf "%s\n" "yes" >&6; }
         dummy=yes
 fi
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for Lua 5.1 through 5.4" >&5
+printf %s "checking for Lua 5.1 through 5.4... " >&6; }
+lua_pkg=""
+for candidate in lua5.4 lua5.3 lua5.2 lua5.1; do
+  if $PKG_CONFIG --exists "$candidate"; then
+    lua_pkg="$candidate"
+    break
+  fi
+done
+if test -z "$lua_pkg"; then
+  { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: error: in '$ac_pwd':" >&5
+printf "%s\n" "$as_me: error: in '$ac_pwd':" >&2;}
+as_fn_error $? "Lua 5.1, 5.2, 5.3, or 5.4 is required
+See 'config.log' for more details" "$LINENO" 5; }
+fi
+LUA_CFLAGS=`$PKG_CONFIG --cflags "$lua_pkg"`
+LUA_LIBS=`$PKG_CONFIG --libs "$lua_pkg"`
+
+
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $lua_pkg" >&5
+printf "%s\n" "$lua_pkg" >&6; }
 
 # libmodbus
 

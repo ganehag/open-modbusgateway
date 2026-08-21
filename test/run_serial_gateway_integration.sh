@@ -60,6 +60,9 @@ config mqtt
     option request_topic 'request'
     option response_topic 'response'
 
+config automation
+    option script '$ROOT_DIR/examples/automation.lua.example'
+
 config serial_gateway
     option id '$SERIAL_ID'
     option device '$MASTER_DEV'

@@ -27,6 +27,7 @@
 #include <string.h>
 
 #include "config_parser.h"
+#include "automation.h"
 #include "filters.h"
 #include "log.h"
 #include "mqtt_client.h"
@@ -394,6 +395,7 @@ mqtt_connect_callback(struct mosquitto *mosq, void *obj, int result) {
     (void)result;
 
     mosquitto_subscribe(mosq, NULL, config->request_topic, 0);
+    automation_emit_mqtt_connected();
 }
 
 void

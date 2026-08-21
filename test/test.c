@@ -38,6 +38,9 @@ int main() {
     CU_add_test(suite3, "test_config_parse_serial_gateway", test_config_parse_serial_gateway);
     CU_add_test(suite3, "test_config_parse_serial_rule", test_config_parse_serial_rule);
     CU_add_test(suite3,
+                "test_config_parse_automation",
+                test_config_parse_automation);
+    CU_add_test(suite3,
                 "test_validate_config_without_rules",
                 test_validate_config_without_rules);
     CU_add_test(suite3, "test_validate_config_tls_options", test_validate_config_tls_options);
@@ -73,6 +76,12 @@ int main() {
     CU_add_test(suite5,
                 "test_mqtt_rejects_invalid_tcp_address",
                 test_mqtt_rejects_invalid_tcp_address);
+
+    CU_pSuite suite6 = CU_add_suite("Automation", NULL, NULL);
+    CU_add_test(suite6, "test_automation_callbacks", test_automation_callbacks);
+    CU_add_test(suite6,
+                "test_automation_instruction_limit",
+                test_automation_instruction_limit);
 
     CU_basic_set_mode(CU_BRM_VERBOSE);
     CU_basic_run_tests();

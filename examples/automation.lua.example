@@ -1,0 +1,10 @@
+-- This file is loaded once when configured through `config automation`.
+-- Define only the callbacks that your deployment needs.
+
+function on_mqtt_connected(event)
+    gateway.log("MQTT connected at " .. event.timestamp_ms)
+end
+
+function on_mqtt_disconnected(event)
+    gateway.log("MQTT disconnected: " .. event.reason)
+end

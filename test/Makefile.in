@@ -111,10 +111,13 @@ am_openmmg_tests_OBJECTS = openmmg_tests-mqtt_test_helpers.$(OBJEXT) \
 	$(top_builddir)/src/openmmg_tests-filters.$(OBJEXT) \
 	$(top_builddir)/src/openmmg_tests-iprange.$(OBJEXT) \
 	$(top_builddir)/src/openmmg_tests-log.$(OBJEXT) \
-	$(top_builddir)/src/openmmg_tests-mqtt_client.$(OBJEXT)
+	$(top_builddir)/src/openmmg_tests-mqtt_client.$(OBJEXT) \
+	$(top_builddir)/src/openmmg_tests-automation.$(OBJEXT) \
+	openmmg_tests-test_automation.$(OBJEXT)
 openmmg_tests_OBJECTS = $(am_openmmg_tests_OBJECTS)
 am__DEPENDENCIES_1 =
-openmmg_tests_DEPENDENCIES = $(am__DEPENDENCIES_1)
+openmmg_tests_DEPENDENCIES = $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 openmmg_tests_LINK = $(CCLD) $(openmmg_tests_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
 AM_V_P = $(am__v_P_@AM_V@)
@@ -133,6 +136,7 @@ DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__maybe_remake_depfiles = depfiles
 am__depfiles_remade =  \
+	$(top_builddir)/src/$(DEPDIR)/openmmg_tests-automation.Po \
 	$(top_builddir)/src/$(DEPDIR)/openmmg_tests-config_parser.Po \
 	$(top_builddir)/src/$(DEPDIR)/openmmg_tests-filters.Po \
 	$(top_builddir)/src/$(DEPDIR)/openmmg_tests-iprange.Po \
@@ -140,6 +144,7 @@ am__depfiles_remade =  \
 	$(top_builddir)/src/$(DEPDIR)/openmmg_tests-mqtt_client.Po \
 	./$(DEPDIR)/openmmg_tests-mqtt_test_helpers.Po \
 	./$(DEPDIR)/openmmg_tests-test.Po \
+	./$(DEPDIR)/openmmg_tests-test_automation.Po \
 	./$(DEPDIR)/openmmg_tests-test_config.Po \
 	./$(DEPDIR)/openmmg_tests-test_filters.Po \
 	./$(DEPDIR)/openmmg_tests-test_ip_in_range.Po \
@@ -431,6 +436,8 @@ LDFLAGS = @LDFLAGS@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
 LTLIBOBJS = @LTLIBOBJS@
+LUA_CFLAGS = @LUA_CFLAGS@
+LUA_LIBS = @LUA_LIBS@
 MAKEINFO = @MAKEINFO@
 MKDIR_P = @MKDIR_P@
 MODBUS_CFLAGS = @MODBUS_CFLAGS@
@@ -514,10 +521,12 @@ openmmg_tests_SOURCES = \
     $(top_srcdir)/src/filters.c \
     $(top_srcdir)/src/iprange.c \
     $(top_srcdir)/src/log.c \
-    $(top_srcdir)/src/mqtt_client.c
+    $(top_srcdir)/src/mqtt_client.c \
+    $(top_srcdir)/src/automation.c \
+    test_automation.c
 
-openmmg_tests_CFLAGS = $(CUNIT_CFLAGS)
-openmmg_tests_LDADD = $(CUNIT_LIBS)
+openmmg_tests_CFLAGS = $(CUNIT_CFLAGS) $(LUA_CFLAGS)
+openmmg_tests_LDADD = $(CUNIT_LIBS) $(LUA_LIBS)
 all: all-am
 
 .SUFFIXES:
@@ -575,6 +584,9 @@ $(top_builddir)/src/openmmg_tests-log.$(OBJEXT):  \
 $(top_builddir)/src/openmmg_tests-mqtt_client.$(OBJEXT):  \
 	$(top_builddir)/src/$(am__dirstamp) \
 	$(top_builddir)/src/$(DEPDIR)/$(am__dirstamp)
+$(top_builddir)/src/openmmg_tests-automation.$(OBJEXT):  \
+	$(top_builddir)/src/$(am__dirstamp) \
+	$(top_builddir)/src/$(DEPDIR)/$(am__dirstamp)
 
 openmmg_tests$(EXEEXT): $(openmmg_tests_OBJECTS) $(openmmg_tests_DEPENDENCIES) $(EXTRA_openmmg_tests_DEPENDENCIES) 
 	@rm -f openmmg_tests$(EXEEXT)
@@ -587,6 +599,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@$(top_builddir)/src/$(DEPDIR)/openmmg_tests-automation.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@$(top_builddir)/src/$(DEPDIR)/openmmg_tests-config_parser.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@$(top_builddir)/src/$(DEPDIR)/openmmg_tests-filters.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@$(top_builddir)/src/$(DEPDIR)/openmmg_tests-iprange.Po@am__quote@ # am--include-marker
@@ -594,6 +607,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@$(top_builddir)/src/$(DEPDIR)/openmmg_tests-mqtt_client.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/openmmg_tests-mqtt_test_helpers.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/openmmg_tests-test.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/openmmg_tests-test_automation.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/openmmg_tests-test_config.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/openmmg_tests-test_filters.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/openmmg_tests-test_ip_in_range.Po@am__quote@ # am--include-marker
@@ -774,6 +788,34 @@ $(top_builddir)/src/openmmg_tests-mqtt_client.obj: $(top_builddir)/src/mqtt_clie
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$(top_builddir)/src/mqtt_client.c' object='$(top_builddir)/src/openmmg_tests-mqtt_client.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openmmg_tests_CFLAGS) $(CFLAGS) -c -o $(top_builddir)/src/openmmg_tests-mqtt_client.obj `if test -f '$(top_builddir)/src/mqtt_client.c'; then $(CYGPATH_W) '$(top_builddir)/src/mqtt_client.c'; else $(CYGPATH_W) '$(srcdir)/$(top_builddir)/src/mqtt_client.c'; fi`
+
+$(top_builddir)/src/openmmg_tests-automation.o: $(top_builddir)/src/automation.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openmmg_tests_CFLAGS) $(CFLAGS) -MT $(top_builddir)/src/openmmg_tests-automation.o -MD -MP -MF $(top_builddir)/src/$(DEPDIR)/openmmg_tests-automation.Tpo -c -o $(top_builddir)/src/openmmg_tests-automation.o `test -f '$(top_builddir)/src/automation.c' || echo '$(srcdir)/'`$(top_builddir)/src/automation.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(top_builddir)/src/$(DEPDIR)/openmmg_tests-automation.Tpo $(top_builddir)/src/$(DEPDIR)/openmmg_tests-automation.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$(top_builddir)/src/automation.c' object='$(top_builddir)/src/openmmg_tests-automation.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openmmg_tests_CFLAGS) $(CFLAGS) -c -o $(top_builddir)/src/openmmg_tests-automation.o `test -f '$(top_builddir)/src/automation.c' || echo '$(srcdir)/'`$(top_builddir)/src/automation.c
+
+$(top_builddir)/src/openmmg_tests-automation.obj: $(top_builddir)/src/automation.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openmmg_tests_CFLAGS) $(CFLAGS) -MT $(top_builddir)/src/openmmg_tests-automation.obj -MD -MP -MF $(top_builddir)/src/$(DEPDIR)/openmmg_tests-automation.Tpo -c -o $(top_builddir)/src/openmmg_tests-automation.obj `if test -f '$(top_builddir)/src/automation.c'; then $(CYGPATH_W) '$(top_builddir)/src/automation.c'; else $(CYGPATH_W) '$(srcdir)/$(top_builddir)/src/automation.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(top_builddir)/src/$(DEPDIR)/openmmg_tests-automation.Tpo $(top_builddir)/src/$(DEPDIR)/openmmg_tests-automation.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$(top_builddir)/src/automation.c' object='$(top_builddir)/src/openmmg_tests-automation.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openmmg_tests_CFLAGS) $(CFLAGS) -c -o $(top_builddir)/src/openmmg_tests-automation.obj `if test -f '$(top_builddir)/src/automation.c'; then $(CYGPATH_W) '$(top_builddir)/src/automation.c'; else $(CYGPATH_W) '$(srcdir)/$(top_builddir)/src/automation.c'; fi`
+
+openmmg_tests-test_automation.o: test_automation.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openmmg_tests_CFLAGS) $(CFLAGS) -MT openmmg_tests-test_automation.o -MD -MP -MF $(DEPDIR)/openmmg_tests-test_automation.Tpo -c -o openmmg_tests-test_automation.o `test -f 'test_automation.c' || echo '$(srcdir)/'`test_automation.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/openmmg_tests-test_automation.Tpo $(DEPDIR)/openmmg_tests-test_automation.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='test_automation.c' object='openmmg_tests-test_automation.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openmmg_tests_CFLAGS) $(CFLAGS) -c -o openmmg_tests-test_automation.o `test -f 'test_automation.c' || echo '$(srcdir)/'`test_automation.c
+
+openmmg_tests-test_automation.obj: test_automation.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openmmg_tests_CFLAGS) $(CFLAGS) -MT openmmg_tests-test_automation.obj -MD -MP -MF $(DEPDIR)/openmmg_tests-test_automation.Tpo -c -o openmmg_tests-test_automation.obj `if test -f 'test_automation.c'; then $(CYGPATH_W) 'test_automation.c'; else $(CYGPATH_W) '$(srcdir)/test_automation.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/openmmg_tests-test_automation.Tpo $(DEPDIR)/openmmg_tests-test_automation.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='test_automation.c' object='openmmg_tests-test_automation.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openmmg_tests_CFLAGS) $(CFLAGS) -c -o openmmg_tests-test_automation.obj `if test -f 'test_automation.c'; then $(CYGPATH_W) 'test_automation.c'; else $(CYGPATH_W) '$(srcdir)/test_automation.c'; fi`
 
 ID: $(am__tagged_files)
 	$(am__define_uniq_tagged_files); mkid -fID $$unique
@@ -1093,6 +1135,7 @@ clean: clean-am
 clean-am: clean-checkPROGRAMS clean-generic mostlyclean-am
 
 distclean: distclean-am
+	-rm -f $(top_builddir)/src/$(DEPDIR)/openmmg_tests-automation.Po
 	-rm -f $(top_builddir)/src/$(DEPDIR)/openmmg_tests-config_parser.Po
 	-rm -f $(top_builddir)/src/$(DEPDIR)/openmmg_tests-filters.Po
 	-rm -f $(top_builddir)/src/$(DEPDIR)/openmmg_tests-iprange.Po
@@ -1100,6 +1143,7 @@ distclean: distclean-am
 	-rm -f $(top_builddir)/src/$(DEPDIR)/openmmg_tests-mqtt_client.Po
 	-rm -f ./$(DEPDIR)/openmmg_tests-mqtt_test_helpers.Po
 	-rm -f ./$(DEPDIR)/openmmg_tests-test.Po
+	-rm -f ./$(DEPDIR)/openmmg_tests-test_automation.Po
 	-rm -f ./$(DEPDIR)/openmmg_tests-test_config.Po
 	-rm -f ./$(DEPDIR)/openmmg_tests-test_filters.Po
 	-rm -f ./$(DEPDIR)/openmmg_tests-test_ip_in_range.Po
@@ -1149,6 +1193,7 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-am
+	-rm -f $(top_builddir)/src/$(DEPDIR)/openmmg_tests-automation.Po
 	-rm -f $(top_builddir)/src/$(DEPDIR)/openmmg_tests-config_parser.Po
 	-rm -f $(top_builddir)/src/$(DEPDIR)/openmmg_tests-filters.Po
 	-rm -f $(top_builddir)/src/$(DEPDIR)/openmmg_tests-iprange.Po
@@ -1156,6 +1201,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f $(top_builddir)/src/$(DEPDIR)/openmmg_tests-mqtt_client.Po
 	-rm -f ./$(DEPDIR)/openmmg_tests-mqtt_test_helpers.Po
 	-rm -f ./$(DEPDIR)/openmmg_tests-test.Po
+	-rm -f ./$(DEPDIR)/openmmg_tests-test_automation.Po
 	-rm -f ./$(DEPDIR)/openmmg_tests-test_config.Po
 	-rm -f ./$(DEPDIR)/openmmg_tests-test_filters.Po
 	-rm -f ./$(DEPDIR)/openmmg_tests-test_ip_in_range.Po

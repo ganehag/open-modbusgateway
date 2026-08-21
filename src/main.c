@@ -33,6 +33,7 @@
 #include <unistd.h>
 
 #include "config_parser.h"
+#include "automation.h"
 #include "filters.h"
 #include "log.h"
 #include "mqtt_client.h"
@@ -226,6 +227,11 @@ main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    if (automation_init(config.automation_script) != 0) {
+        flog(logfile, "unable to initialize automation\n");
+        exit(EXIT_FAILURE);
+    }
+
     if (daemon) {
         if (daemonize() != 0) {
             flog(logfile, "unable to start as daemon\n");
@@ -326,6 +332,7 @@ main(int argc, char *argv[]) {
             rc = mosquitto_loop(mosq, -1, 1);
             if (run && rc) {
                 flog(logfile, "connection error: %s\n", mosquitto_strerror(rc));
+                automation_emit_mqtt_disconnected(mosquitto_strerror(rc));
                 sleep(10);
                 mosquitto_reconnect(mosq);
             }
@@ -335,6 +342,7 @@ main(int argc, char *argv[]) {
     }
 
     mosquitto_lib_cleanup();
+    automation_shutdown();
 
     // close log file
     if (logfile != NULL && logfile != stderr) {
