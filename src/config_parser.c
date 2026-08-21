@@ -17,6 +17,10 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <ctype.h>
 #include <errno.h>
 #include <regex.h>
@@ -456,7 +460,7 @@ parse_option_range(char *option_value, range_u32_t *list) {
     // size buffer
     char buffer[MAX_LINE_LEN];
     memset(buffer, 0, MAX_LINE_LEN);
-    strncpy(buffer, option_value, MAX_LINE_LEN);
+    strncpy(buffer, option_value, sizeof(buffer) - 1);
 
     // clear the list, just in case
     memset(list, 0, sizeof(range_u32_t) * MAX_RANGES);

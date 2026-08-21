@@ -1,6 +1,7 @@
 AC_INIT([modbusgateway],[0.3.0],[mikael.brorsson@gmail.com])
 AC_CONFIG_SRCDIR([src/main.c])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign subdir-objects])
+AC_USE_SYSTEM_EXTENSIONS
 
 AC_LANG([C])
 

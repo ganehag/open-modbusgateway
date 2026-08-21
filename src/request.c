@@ -72,7 +72,7 @@ join_regs_str(const uint16_t datalen, const uint16_t *data, const char *sep) {
         void *tmp =
             realloc(joined, sz + len + (is_first == true ? 0 : lensep) + 1);
         if (!tmp) {
-            // Allocation error
+            free(joined);
             return NULL;
         }
 

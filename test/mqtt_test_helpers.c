@@ -24,8 +24,7 @@ request_thread_reserve(void) {
 }
 
 void
-request_thread_release(void) {
-}
+request_thread_release(void) {}
 
 void
 mqtt_test_reset(void) {
@@ -118,9 +117,7 @@ pthread_create(pthread_t *thread,
                void *arg) {
     (void)attr;
 
-    if (thread != NULL) {
-        memset(thread, 0, sizeof(*thread));
-    }
+    memset(thread, 0, sizeof(*thread));
 
     captured_request = (request_t *)arg;
     (void)start_routine;
@@ -138,8 +135,7 @@ join_regs_str(const uint16_t datalen, const uint16_t *data, const char *sep) {
     uint8_t is_first = true;
     char buff[12];
 
-    size_t max_len =
-        datalen * (sizeof(buff) + lensep) + 1; // rough upper bound
+    size_t max_len = datalen * (sizeof(buff) + lensep) + 1; // rough upper bound
     char *joined = calloc(max_len, sizeof(char));
     if (joined == NULL) {
         return NULL;

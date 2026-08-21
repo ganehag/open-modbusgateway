@@ -18,6 +18,7 @@
  */
 
 #include <arpa/inet.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -83,18 +84,16 @@ ip_cidr_to_in6(const char *ip_cidr, iprange_t *range) {
         return IP_CIDR_INVALID_IP;
     }
 
-    // parse CIDR mask, convert to netmask and store in range->netmask
-    int netmask = atoi(slash);
-
-    // check for errors in case atoi failed since atoi return 0 on error
-    if (netmask == 0 && strncmp(slash, "0", 1) != 0) {
+    // Parse the CIDR mask strictly so overflow and trailing characters cannot
+    // be treated as a valid address range.
+    errno = 0;
+    char *end = NULL;
+    long parsed_netmask = strtol(slash, &end, 10);
+    if (errno != 0 || end == slash || *end != '\0' || parsed_netmask < 0 ||
+        parsed_netmask > 128) {
         return IP_CIDR_INVALID_CIDR;
     }
-
-    // ensure netmask is valid
-    if (netmask < 0 || netmask > 128) {
-        return IP_CIDR_INVALID_CIDR;
-    }
+    int netmask = (int)parsed_netmask;
 
     // create netmask using cidr_to_netmask function
     if (cidr_to_netmask(netmask, &(range->netmask)) != 0) {

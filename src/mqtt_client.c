@@ -17,6 +17,10 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <arpa/inet.h>
 #include <errno.h>
 #include <mosquitto.h>
@@ -55,6 +59,15 @@ parse_register_values(char *raw_registers, request_t *req) {
     }
 
     return token == NULL ? 0 : -1;
+}
+
+static int
+is_valid_request_port(const char *port) {
+    char *end = NULL;
+    errno = 0;
+    unsigned long value = strtoul(port, &end, 10);
+    return errno == 0 && end != port && *end == '\0' && value > 0 &&
+           value <= UINT16_MAX;
 }
 
 void
@@ -294,6 +307,11 @@ mqtt_message_callback(struct mosquitto *mosq,
         goto cleanup;
     }
 
+    if (req->format == 0 && !is_valid_request_port(req->port)) {
+        error = MQTT_INVALID_REQUEST;
+        goto cleanup;
+    }
+
     if (req->format == 0 &&
         ((req->ip_type == IP_TYPE_IPV4 &&
           inet_pton(AF_INET, req->ip, &(struct in_addr){0}) != 1) ||
@@ -510,6 +528,11 @@ mqtt_reply_ok(struct mosquitto *mosq,
 
     if (datalen > 0) {
         char *data_str = join_regs_str(datalen, data, " ");
+        if (data_str == NULL) {
+            mqtt_reply_error(
+                mosq, topic, cookie, MQTT_ERROR_MESSAGE, "out of memory");
+            return;
+        }
         snprintf(msg, sizeof(msg), "%llu OK %s", cookie, data_str);
         free(data_str);
     } else {
