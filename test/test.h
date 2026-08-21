@@ -21,6 +21,7 @@ void test_clear_filters(void);
 void test_config_parse_single_rule(void);
 void test_config_parse_serial_gateway(void);
 void test_config_parse_serial_rule(void);
+void test_config_parse_automation(void);
 
 void test_config_parse_file(void);
 void test_parse_option_range_ok(void);
@@ -40,5 +41,10 @@ void test_mqtt_format1_serial_filter_allows(void);
 void test_mqtt_rejects_invalid_write_values(void);
 void test_mqtt_accepts_non_terminated_payload(void);
 void test_mqtt_rejects_invalid_tcp_address(void);
+
+void test_automation_callbacks(void);
+void test_automation_instruction_limit(void);
+void test_automation_memory_limit(void);
+void test_automation_request_hooks(void);
 
 #endif

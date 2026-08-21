@@ -1,0 +1,66 @@
+-- This file is loaded once when configured through `config automation`.
+-- Define only the callbacks that your deployment needs.
+
+function on_mqtt_connected(event)
+    gateway.log("MQTT connected at " .. event.timestamp_ms)
+end
+
+function on_mqtt_disconnected(event)
+    gateway.log("MQTT disconnected: " .. event.reason)
+end
+
+-- Before hooks run synchronously. They may update address, count, and values,
+-- or return false with a reason to reject the request.
+function on_before_read_registers(request)
+    -- Example: map public register 1 to the device's register 100.
+    -- request.address = 100
+end
+
+function on_before_write_registers(request)
+    if request.values[1] and request.values[1] > 1000 then
+        return false, "value exceeds the permitted limit"
+    end
+
+    -- Auxiliary calls use the same configured target and still obey filters.
+    -- local values, err = gateway.read_registers(200, 1)
+    -- assert(values, err)
+    -- assert(gateway.write_registers(201, { values[1] }))
+end
+
+-- After hooks can transform read values before the MQTT reply is published.
+function on_after_read_registers(response)
+    -- response.values[1] = response.values[1] * 10
+end
+
+-- Reset register 401 thirty minutes after its last successful external write.
+-- The target descriptor comes from the gateway and cannot bypass filters.
+local watched_register = 401
+local reset_value = 0
+local inactivity_ms = 30 * 60 * 1000
+local last_write_ms
+local reset_target
+
+function on_modbus_succeeded(event)
+    local count = event.function_code == 6 and 1 or event.register_count
+    if (event.function_code == 6 or event.function_code == 16)
+       and event.register_address <= watched_register
+       and watched_register < event.register_address + count then
+        last_write_ms = event.timestamp_ms
+        reset_target = event.target
+    end
+end
+
+function on_timer(event)
+    if not reset_target or not last_write_ms
+       or event.timestamp_ms - last_write_ms < inactivity_ms then
+        return
+    end
+
+    -- Clear first so a failed reset does not retry every second.
+    last_write_ms = nil
+    local ok, err = gateway.write_registers_to(
+        reset_target, watched_register, { reset_value })
+    if not ok then
+        gateway.log("inactivity reset failed: " .. err)
+    end
+end

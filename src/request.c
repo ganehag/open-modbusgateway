@@ -17,19 +17,26 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <errno.h>
 #include <modbus/modbus.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
+#include "automation.h"
 #include "log.h"
 #include "mqtt_client.h"
 #include "request.h"
 
 uint16_t request_count = 0;
 pthread_mutex_t request_count_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t request_count_cond = PTHREAD_COND_INITIALIZER;
 
 int
 request_thread_reserve(void) {
@@ -51,7 +58,34 @@ request_thread_release(void) {
     if (request_count > 0) {
         request_count--;
     }
+    if (request_count == 0) {
+        pthread_cond_broadcast(&request_count_cond);
+    }
     pthread_mutex_unlock(&request_count_mutex);
+}
+
+int
+request_wait_for_completion(unsigned int timeout_ms) {
+    struct timespec deadline;
+    clock_gettime(CLOCK_REALTIME, &deadline);
+    deadline.tv_sec += timeout_ms / 1000;
+    deadline.tv_nsec += (long)(timeout_ms % 1000) * 1000000L;
+    if (deadline.tv_nsec >= 1000000000L) {
+        deadline.tv_sec++;
+        deadline.tv_nsec -= 1000000000L;
+    }
+
+    pthread_mutex_lock(&request_count_mutex);
+    while (request_count > 0) {
+        int result = pthread_cond_timedwait(
+            &request_count_cond, &request_count_mutex, &deadline);
+        if (result == ETIMEDOUT) {
+            pthread_mutex_unlock(&request_count_mutex);
+            return -1;
+        }
+    }
+    pthread_mutex_unlock(&request_count_mutex);
+    return 0;
 }
 
 char *
@@ -71,7 +105,7 @@ join_regs_str(const uint16_t datalen, const uint16_t *data, const char *sep) {
         void *tmp =
             realloc(joined, sz + len + (is_first == true ? 0 : lensep) + 1);
         if (!tmp) {
-            // Allocation error
+            free(joined);
             return NULL;
         }
 
@@ -93,41 +127,9 @@ void *
 handle_request(void *arg) {
     modbus_t *ctx = NULL;
     request_t *req = (request_t *)arg;
-    // debug print request after cast
+    int succeeded = 0;
+    char failure_reason[128] = "request failed";
 
-#ifdef DEBUG
-    flog(logfile, "void *handle_request(void *arg)\n");
-    if (req->format == 1) {
-        flog(logfile,
-             "format 1: %hhu %llu %s %s %d-%c-%d-%d %hu %hhu %u %hu\n",
-             req->format,
-             req->cookie,
-             req->serial_id,
-             req->serial_device,
-             req->serial_baud,
-             req->serial_parity,
-             req->serial_data_bits,
-             req->serial_stop_bits,
-             req->timeout,
-             req->slave_id,
-             req->register_addr,
-             req->register_count);
-    } else {
-        flog(logfile,
-             "format 0: %hhu %llu %hhu %s %s %hu %hhu %u %hu\n",
-             req->format,
-             req->cookie,
-             req->ip_type,
-             req->ip,
-             req->port,
-             req->timeout,
-             req->slave_id,
-             req->register_addr,
-             req->register_count);
-    }
-#endif
-
-    // Detach from the parent thread (join not required)
     pthread_detach(pthread_self());
 
     if (req->format == 1) {
@@ -141,197 +143,80 @@ handle_request(void *arg) {
     }
 
     if (ctx == NULL) {
-        mqtt_reply_error(req->mosq,
-                         req->response_topic,
-                         req->cookie,
-                         MQTT_ERROR_MESSAGE,
-                         modbus_strerror(errno));
+        snprintf(failure_reason,
+                 sizeof(failure_reason),
+                 "%s",
+                 modbus_strerror(errno));
         goto modbus_cleanup;
     }
 
-    // Set the timeout
     modbus_set_response_timeout(ctx, req->timeout, 0);
-
-    // Set the slave id
     modbus_set_slave(ctx, req->slave_id);
-
-    // Perform a connect
     if (modbus_connect(ctx) == -1) {
-        mqtt_reply_error(req->mosq,
-                         req->response_topic,
-                         req->cookie,
-                         MQTT_ERROR_MESSAGE,
-                         modbus_strerror(errno));
+        snprintf(failure_reason,
+                 sizeof(failure_reason),
+                 "%s",
+                 modbus_strerror(errno));
         goto modbus_cleanup;
-    } else {
-        uint8_t coil_data[123];
-
-        switch (req->function) {
-        case 1: // Read coils
-            if (modbus_read_bits(
-                    ctx, req->register_addr, req->register_count, coil_data) ==
-                -1) {
-                mqtt_reply_error(req->mosq,
-                                 req->response_topic,
-                                 req->cookie,
-                                 MQTT_ERROR_MESSAGE,
-                                 modbus_strerror(errno));
-                goto modbus_cleanup;
-            }
-            for (int i = 0; i < req->register_count; i++) {
-                req->data[i] = coil_data[i];
-            }
-
-            mqtt_reply_ok(req->mosq,
-                          req->response_topic,
-                          req->cookie,
-                          req->register_count,
-                          req->data);
-            break;
-        case 2: // Read discrete inputs
-            if (modbus_read_input_bits(
-                    ctx, req->register_addr, req->register_count, coil_data) ==
-                -1) {
-                mqtt_reply_error(req->mosq,
-                                 req->response_topic,
-                                 req->cookie,
-                                 MQTT_ERROR_MESSAGE,
-                                 modbus_strerror(errno));
-                goto modbus_cleanup;
-            }
-            for (int i = 0; i < req->register_count; i++) {
-                req->data[i] = coil_data[i];
-            }
-
-            mqtt_reply_ok(req->mosq,
-                          req->response_topic,
-                          req->cookie,
-                          req->register_count,
-                          req->data);
-            break;
-        case 3: // Read holding register
-            if (modbus_read_registers(
-                    ctx, req->register_addr, req->register_count, req->data) ==
-                -1) {
-                mqtt_reply_error(req->mosq,
-                                 req->response_topic,
-                                 req->cookie,
-                                 MQTT_ERROR_MESSAGE,
-                                 modbus_strerror(errno));
-                goto modbus_cleanup;
-            }
-
-            mqtt_reply_ok(req->mosq,
-                          req->response_topic,
-                          req->cookie,
-                          req->register_count,
-                          req->data);
-            break;
-        case 4: // Read input register
-            if (modbus_read_input_registers(
-                    ctx, req->register_addr, req->register_count, req->data) ==
-                -1) {
-                mqtt_reply_error(req->mosq,
-                                 req->response_topic,
-                                 req->cookie,
-                                 MQTT_ERROR_MESSAGE,
-                                 modbus_strerror(errno));
-                goto modbus_cleanup;
-            }
-
-            mqtt_reply_ok(req->mosq,
-                          req->response_topic,
-                          req->cookie,
-                          req->register_count,
-                          req->data);
-            break;
-        case 5: // Function code 5 (force/write single coil)
-            if (req->register_count > 0) {
-                coil_data[0] = TRUE;
-            } else {
-                coil_data[0] = FALSE;
-            }
-
-            if (modbus_write_bit(ctx, req->register_addr, coil_data[0]) == -1) {
-                mqtt_reply_error(req->mosq,
-                                 req->response_topic,
-                                 req->cookie,
-                                 MQTT_ERROR_MESSAGE,
-                                 modbus_strerror(errno));
-                goto modbus_cleanup;
-            }
-
-            mqtt_reply_ok(req->mosq, req->response_topic, req->cookie, 0, NULL);
-            break;
-        case 6: // Write single holding register
-            if (modbus_write_register(
-                    ctx, req->register_addr, req->register_count) == -1) {
-                mqtt_reply_error(req->mosq,
-                                 req->response_topic,
-                                 req->cookie,
-                                 MQTT_ERROR_MESSAGE,
-                                 modbus_strerror(errno));
-                goto modbus_cleanup;
-            }
-
-            mqtt_reply_ok(req->mosq, req->response_topic, req->cookie, 0, NULL);
-            break;
-        case 15: // Function code 15 (force/write multiple coils)
-            for (int i = 0; i < req->register_count; i++) {
-                coil_data[i] = (req->data[i] > 0) ? TRUE : FALSE;
-            }
-            if (modbus_write_bits(
-                    ctx, req->register_addr, req->register_count, coil_data) ==
-                -1) {
-                mqtt_reply_error(req->mosq,
-                                 req->response_topic,
-                                 req->cookie,
-                                 MQTT_ERROR_MESSAGE,
-                                 modbus_strerror(errno));
-                goto modbus_cleanup;
-            }
-
-            mqtt_reply_ok(req->mosq, req->response_topic, req->cookie, 0, NULL);
-            break;
-        case 16: // write multiple holding registers
-            if (modbus_write_registers(
-                    ctx, req->register_addr, req->register_count, req->data) ==
-                -1) {
-                mqtt_reply_error(req->mosq,
-                                 req->response_topic,
-                                 req->cookie,
-                                 MQTT_ERROR_MESSAGE,
-                                 modbus_strerror(errno));
-                goto modbus_cleanup;
-            }
-
-            mqtt_reply_ok(req->mosq, req->response_topic, req->cookie, 0, NULL);
-            break;
-        default:
-            mqtt_reply_error(req->mosq,
-                             req->response_topic,
-                             req->cookie,
-                             MQTT_INVALID_REQUEST,
-                             NULL);
-            goto modbus_cleanup;
-            break;
-        }
-
-#ifdef DEBUG
-
-        if (req->function >= 1 && req->function <= 4) {
-            for (int i = 0; i < req->register_count; i++) {
-                fprintf(logfile,
-                        "data[%d] = %d (0x%X)\n",
-                        i,
-                        req->data[i],
-                        req->data[i]);
-            }
-        }
-#endif
     }
+
+    uint8_t coil_data[125];
+    int result = -1;
+    switch (req->function) {
+    case 1:
+        result = modbus_read_bits(
+            ctx, req->register_addr, req->register_count, coil_data);
+        for (int i = 0; result != -1 && i < req->register_count; i++)
+            req->data[i] = coil_data[i];
+        break;
+    case 2:
+        result = modbus_read_input_bits(
+            ctx, req->register_addr, req->register_count, coil_data);
+        for (int i = 0; result != -1 && i < req->register_count; i++)
+            req->data[i] = coil_data[i];
+        break;
+    case 3:
+        result = modbus_read_registers(
+            ctx, req->register_addr, req->register_count, req->data);
+        break;
+    case 4:
+        result = modbus_read_input_registers(
+            ctx, req->register_addr, req->register_count, req->data);
+        break;
+    case 5:
+        result = modbus_write_bit(
+            ctx, req->register_addr, req->register_count > 0 ? TRUE : FALSE);
+        break;
+    case 6:
+        result =
+            modbus_write_register(ctx, req->register_addr, req->register_count);
+        break;
+    case 15:
+        for (int i = 0; i < req->register_count; i++)
+            coil_data[i] = req->data[i] > 0 ? TRUE : FALSE;
+        result = modbus_write_bits(
+            ctx, req->register_addr, req->register_count, coil_data);
+        break;
+    case 16:
+        result = modbus_write_registers(
+            ctx, req->register_addr, req->register_count, req->data);
+        break;
+    default:
+        snprintf(
+            failure_reason, sizeof(failure_reason), "invalid Modbus function");
+        goto modbus_cleanup;
+    }
+    if (result == -1) {
+        snprintf(failure_reason,
+                 sizeof(failure_reason),
+                 "%s",
+                 modbus_strerror(errno));
+        goto modbus_cleanup;
+    }
+    succeeded = 1;
 
 modbus_cleanup:
+    automation_queue_modbus_result(req, succeeded, failure_reason);
 
     // Modbus clean-up
     if (ctx != NULL) {
@@ -339,7 +224,6 @@ modbus_cleanup:
         modbus_free(ctx);
     }
 
-    // Must free the allocated argument
     free(req);
 
     request_thread_release();

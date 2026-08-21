@@ -1,6 +1,7 @@
 #include "test.h"
 
-int main() {
+int
+main() {
     // Initialize the CUnit test registry
     if (CUE_SUCCESS != CU_initialize_registry()) {
         return CU_get_error();
@@ -25,22 +26,34 @@ int main() {
                 "test_filter_match_without_filters",
                 test_filter_match_without_filters);
     CU_add_test(suite2, "test_filter_match_serial", test_filter_match_serial);
-    CU_add_test(suite2, "test_multiple_filters_match", test_multiple_filters_match);
+    CU_add_test(
+        suite2, "test_multiple_filters_match", test_multiple_filters_match);
 
     CU_pSuite suite3 = CU_add_suite("Config functions", NULL, NULL);
     CU_add_test(suite3, "test_config_parse_file", test_config_parse_file);
-    CU_add_test(suite3, "test_parse_option_range_ok", test_parse_option_range_ok);
+    CU_add_test(
+        suite3, "test_parse_option_range_ok", test_parse_option_range_ok);
     CU_add_test(suite3,
                 "test_parse_option_range_errors",
                 test_parse_option_range_errors);
-    CU_add_test(suite3, "test_config_file_parser_errors", test_config_file_parser_errors);
-    CU_add_test(suite3, "test_config_parse_single_rule", test_config_parse_single_rule);
-    CU_add_test(suite3, "test_config_parse_serial_gateway", test_config_parse_serial_gateway);
-    CU_add_test(suite3, "test_config_parse_serial_rule", test_config_parse_serial_rule);
+    CU_add_test(suite3,
+                "test_config_file_parser_errors",
+                test_config_file_parser_errors);
+    CU_add_test(
+        suite3, "test_config_parse_single_rule", test_config_parse_single_rule);
+    CU_add_test(suite3,
+                "test_config_parse_serial_gateway",
+                test_config_parse_serial_gateway);
+    CU_add_test(
+        suite3, "test_config_parse_serial_rule", test_config_parse_serial_rule);
+    CU_add_test(
+        suite3, "test_config_parse_automation", test_config_parse_automation);
     CU_add_test(suite3,
                 "test_validate_config_without_rules",
                 test_validate_config_without_rules);
-    CU_add_test(suite3, "test_validate_config_tls_options", test_validate_config_tls_options);
+    CU_add_test(suite3,
+                "test_validate_config_tls_options",
+                test_validate_config_tls_options);
 
     CU_pSuite suite4 = CU_add_suite("Trim functions", NULL, NULL);
     CU_add_test(suite4, "test_trim_functions", test_trim_functions);
@@ -49,9 +62,8 @@ int main() {
     CU_add_test(suite5,
                 "test_mqtt_format1_slave_override",
                 test_mqtt_format1_slave_override);
-    CU_add_test(suite5,
-                "test_mqtt_format1_no_override",
-                test_mqtt_format1_no_override);
+    CU_add_test(
+        suite5, "test_mqtt_format1_no_override", test_mqtt_format1_no_override);
     CU_add_test(suite5,
                 "test_mqtt_format1_reject_extra_token",
                 test_mqtt_format1_reject_extra_token);
@@ -73,6 +85,16 @@ int main() {
     CU_add_test(suite5,
                 "test_mqtt_rejects_invalid_tcp_address",
                 test_mqtt_rejects_invalid_tcp_address);
+
+    CU_pSuite suite6 = CU_add_suite("Automation", NULL, NULL);
+    CU_add_test(suite6, "test_automation_callbacks", test_automation_callbacks);
+    CU_add_test(suite6,
+                "test_automation_instruction_limit",
+                test_automation_instruction_limit);
+    CU_add_test(
+        suite6, "test_automation_memory_limit", test_automation_memory_limit);
+    CU_add_test(
+        suite6, "test_automation_request_hooks", test_automation_request_hooks);
 
     CU_basic_set_mode(CU_BRM_VERBOSE);
     CU_basic_run_tests();

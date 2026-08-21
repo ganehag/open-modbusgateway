@@ -17,6 +17,10 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -32,6 +36,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "automation.h"
 #include "config_parser.h"
 #include "filters.h"
 #include "log.h"
@@ -133,7 +138,7 @@ main(int argc, char *argv[]) {
     memset(&config, 0, sizeof(config_t));
 
     int rc = 0;
-    struct mosquitto *mosq;
+    struct mosquitto *mosq = NULL;
 
     // Handle signals
     signal(SIGINT, handle_signal);
@@ -226,6 +231,12 @@ main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    if (automation_init(config.automation_script) != 0) {
+        flog(logfile, "unable to initialize automation\n");
+        exit(EXIT_FAILURE);
+    }
+    automation_set_config(&config);
+
     if (daemon) {
         if (daemonize() != 0) {
             flog(logfile, "unable to start as daemon\n");
@@ -242,6 +253,7 @@ main(int argc, char *argv[]) {
     }
 
     flog(logfile, "starting Open MQTT Modbus Gateway\n");
+    automation_emit_gateway_started();
 
     // Initialize the mosquitto library
     mosquitto_lib_init();
@@ -323,18 +335,29 @@ main(int argc, char *argv[]) {
 
         // Start the main loop
         while (run) {
-            rc = mosquitto_loop(mosq, -1, 1);
+            rc = mosquitto_loop(mosq, 1000, 1);
+            automation_dispatch_pending();
+            automation_emit_timer();
             if (run && rc) {
                 flog(logfile, "connection error: %s\n", mosquitto_strerror(rc));
+                automation_emit_mqtt_disconnected(mosquitto_strerror(rc));
                 sleep(10);
                 mosquitto_reconnect(mosq);
             }
         }
-    terminate:
-        mosquitto_destroy(mosq);
+    terminate:;
     }
 
+    if (request_wait_for_completion(5000) != 0) {
+        flog(logfile, "timed out waiting for active Modbus requests\n");
+    }
+    automation_dispatch_pending();
+    if (mosq != NULL) {
+        mosquitto_destroy(mosq);
+    }
     mosquitto_lib_cleanup();
+    automation_emit_gateway_stopping();
+    automation_shutdown();
 
     // close log file
     if (logfile != NULL && logfile != stderr) {

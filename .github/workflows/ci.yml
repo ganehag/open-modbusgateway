@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - lua: "5.1"
+            package: liblua5.1-0-dev
+          - lua: "5.2"
+            package: liblua5.2-dev
+          - lua: "5.3"
+            package: liblua5.3-dev
+          - lua: "5.4"
+            package: liblua5.4-dev
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update
+      - run: >-
+          sudo apt-get install -y autoconf automake libtool pkg-config
+          libcunit1-dev libmodbus-dev libmosquitto-dev ${{ matrix.package }}
+      - run: autoreconf -fi
+      - run: ./configure --prefix=/usr
+      - run: make check
+
+  sanitizer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update
+      - run: >-
+          sudo apt-get install -y autoconf automake libtool pkg-config
+          libcunit1-dev libmodbus-dev libmosquitto-dev liblua5.4-dev
+      - run: autoreconf -fi
+      - run: >-
+          ./configure --prefix=/usr
+          CFLAGS='-std=c11 -g -O1 -fno-omit-frame-pointer -fsanitize=address,undefined'
+          LDFLAGS='-fsanitize=address,undefined'
+      - run: make check
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update
+      - run: >-
+          sudo apt-get install -y autoconf automake libtool pkg-config socat
+          mosquitto mosquitto-clients libmodbus-dev libmosquitto-dev
+          libcunit1-dev liblua5.4-dev
+      - run: autoreconf -fi
+      - run: ./configure --prefix=/usr
+      - run: make integration-check

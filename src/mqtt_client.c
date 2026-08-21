@@ -17,8 +17,12 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <errno.h>
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <arpa/inet.h>
+#include <errno.h>
 #include <mosquitto.h>
 #include <pthread.h>
 #include <stdbool.h>
@@ -26,6 +30,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "automation.h"
 #include "config_parser.h"
 #include "filters.h"
 #include "log.h"
@@ -44,8 +49,7 @@ parse_register_values(char *raw_registers, request_t *req) {
         char *end = NULL;
         errno = 0;
         unsigned long value = strtoul(token, &end, 10);
-        if (errno != 0 || end == token || *end != '\0' ||
-            value > UINT16_MAX ||
+        if (errno != 0 || end == token || *end != '\0' || value > UINT16_MAX ||
             (req->function == 15 && value > 1)) {
             return -1;
         }
@@ -55,6 +59,15 @@ parse_register_values(char *raw_registers, request_t *req) {
     }
 
     return token == NULL ? 0 : -1;
+}
+
+static int
+is_valid_request_port(const char *port) {
+    char *end = NULL;
+    errno = 0;
+    unsigned long value = strtoul(port, &end, 10);
+    return errno == 0 && end != port && *end == '\0' && value > 0 &&
+           value <= UINT16_MAX;
 }
 
 void
@@ -294,6 +307,11 @@ mqtt_message_callback(struct mosquitto *mosq,
         goto cleanup;
     }
 
+    if (req->format == 0 && !is_valid_request_port(req->port)) {
+        error = MQTT_INVALID_REQUEST;
+        goto cleanup;
+    }
+
     if (req->format == 0 &&
         ((req->ip_type == IP_TYPE_IPV4 &&
           inet_pton(AF_INET, req->ip, &(struct in_addr){0}) != 1) ||
@@ -348,6 +366,31 @@ mqtt_message_callback(struct mosquitto *mosq,
             config->response_topic,
             sizeof(req->response_topic));
 
+    char automation_reason[128] = {0};
+    int automation_result = automation_intercept_request(
+        config, req, automation_reason, sizeof(automation_reason));
+    request_t filter_request = *req;
+    filter_request.register_addr++;
+    if (automation_result != 0 || req->register_addr > 65535 ||
+        ((req->function >= 1 && req->function <= 4) &&
+         (req->register_count == 0 || req->register_count > 125)) ||
+        ((req->function == 15 || req->function == 16) &&
+         (req->register_count == 0 || req->register_count > 123)) ||
+        (req->function == 5 && req->register_count > 1) ||
+        ((req->function <= 4 || req->function == 15 || req->function == 16) &&
+         req->register_addr + req->register_count > 65536) ||
+        filter_match(config->head, &filter_request) != 0) {
+        error = MQTT_ERROR_MESSAGE;
+        const char *message = automation_reason[0] != '\0'
+                                  ? automation_reason
+                                  : "request rejected by automation";
+        mqtt_reply_error(
+            mosq, config->response_topic, req->cookie, error, message);
+        automation_emit_request_rejected(req->cookie, error);
+        free(req);
+        goto done;
+    }
+
     if (!request_thread_reserve()) {
         error = MQTT_ERROR_MESSAGE;
         mqtt_reply_error(mosq,
@@ -355,10 +398,12 @@ mqtt_message_callback(struct mosquitto *mosq,
                          req->cookie,
                          error,
                          "Too many requests");
+        automation_emit_request_rejected(req->cookie, error);
         free(req);
         goto done;
     }
 
+    request_t accepted_request = *req;
     if (pthread_create(&ptid, NULL, &handle_request, req) != 0) {
         request_thread_release();
         error = MQTT_ERROR_MESSAGE;
@@ -367,9 +412,12 @@ mqtt_message_callback(struct mosquitto *mosq,
                          req->cookie,
                          error,
                          "Unable to start request");
+        automation_emit_request_rejected(req->cookie, error);
         free(req);
         goto done;
     }
+
+    automation_emit_request_accepted(&accepted_request);
 
     goto done;
 
@@ -380,6 +428,7 @@ cleanup:
     }
 
     mqtt_reply_error(mosq, config->response_topic, req->cookie, error, NULL);
+    automation_emit_request_rejected(req->cookie, error);
 
     // If something failed along the way
     free(req);
@@ -394,6 +443,7 @@ mqtt_connect_callback(struct mosquitto *mosq, void *obj, int result) {
     (void)result;
 
     mosquitto_subscribe(mosq, NULL, config->request_topic, 0);
+    automation_emit_mqtt_connected();
 }
 
 void
@@ -451,12 +501,11 @@ mqtt_reply_error(struct mosquitto *mosq,
                  cookie);
         break;
     case MQTT_ERROR_MESSAGE:
-        snprintf(
-            error_msg,
-            sizeof(error_msg),
-            "%llu ERROR: %s",
-            cookie,
-            str_msg != NULL ? str_msg : "REQUEST FAILED");
+        snprintf(error_msg,
+                 sizeof(error_msg),
+                 "%llu ERROR: %s",
+                 cookie,
+                 str_msg != NULL ? str_msg : "REQUEST FAILED");
         break;
     default:
         snprintf(error_msg, sizeof(error_msg), "%llu ERROR: UNKNOWN", cookie);
@@ -479,6 +528,11 @@ mqtt_reply_ok(struct mosquitto *mosq,
 
     if (datalen > 0) {
         char *data_str = join_regs_str(datalen, data, " ");
+        if (data_str == NULL) {
+            mqtt_reply_error(
+                mosq, topic, cookie, MQTT_ERROR_MESSAGE, "out of memory");
+            return;
+        }
         snprintf(msg, sizeof(msg), "%llu OK %s", cookie, data_str);
         free(data_str);
     } else {

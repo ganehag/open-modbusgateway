@@ -234,6 +234,8 @@ LDFLAGS = @LDFLAGS@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
 LTLIBOBJS = @LTLIBOBJS@
+LUA_CFLAGS = @LUA_CFLAGS@
+LUA_LIBS = @LUA_LIBS@
 MAKEINFO = @MAKEINFO@
 MKDIR_P = @MKDIR_P@
 MODBUS_CFLAGS = @MODBUS_CFLAGS@
@@ -304,7 +306,9 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 SUBDIRS = src test
-EXTRA_DIST = test/run_serial_gateway_integration.sh test/rtu_slave_sim.c
+EXTRA_DIST = test/run_serial_gateway_integration.sh test/rtu_slave_sim.c \
+    examples/automation.lua.example
+
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
 

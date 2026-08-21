@@ -19,7 +19,7 @@ typedef struct {
     uint8_t function;
     uint32_t register_addr;
     uint16_t register_count;
-    uint16_t data[123];
+    uint16_t data[125];
     char serial_device[128];
     int serial_baud;
     char serial_parity;
@@ -46,5 +46,6 @@ join_regs_str(const uint16_t datalen, const uint16_t *data, const char *sep);
 void *handle_request(void *arg);
 int request_thread_reserve(void);
 void request_thread_release(void);
+int request_wait_for_completion(unsigned int timeout_ms);
 
 #endif
