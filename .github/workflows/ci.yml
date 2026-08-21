@@ -9,13 +9,21 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        lua: ["5.1", "5.2", "5.3", "5.4"]
+        include:
+          - lua: "5.1"
+            package: liblua5.1-0-dev
+          - lua: "5.2"
+            package: liblua5.2-dev
+          - lua: "5.3"
+            package: liblua5.3-dev
+          - lua: "5.4"
+            package: liblua5.4-dev
     steps:
       - uses: actions/checkout@v4
       - run: sudo apt-get update
       - run: >-
           sudo apt-get install -y autoconf automake libtool pkg-config
-          libcunit1-dev libmodbus-dev libmosquitto-dev liblua${{ matrix.lua }}-dev
+          libcunit1-dev libmodbus-dev libmosquitto-dev ${{ matrix.package }}
       - run: autoreconf -fi
       - run: ./configure --prefix=/usr
       - run: make check
