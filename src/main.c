@@ -58,6 +58,7 @@ usage() {
 
 void
 handle_signal(int s) {
+    (void)s;
     run = 0;
 }
 
@@ -80,37 +81,24 @@ daemonize(void) {
     // change the file mode mask
     umask(0);
 
-    // open, check and write pid to file
-    fd = open(pidfile_path, O_RDONLY);
-    if (fd >= 0) {
-        char pidbuf[16];
-
-        // read the contents of the PID file
-        read(fd, pidbuf, sizeof(pidbuf));
-        close(fd);
-
-        // check if the process with the PID in the file is still running
-        pid_t pid_from_file = atoi(pidbuf);
-        if (pid_from_file > 0 && kill(pid_from_file, 0) == 0) {
-            // log that the process is already running
-            flog(logfile,
-                 "process already running with PID %d\n",
-                 pid_from_file);
-            exit(EXIT_FAILURE);
-        }
-
-        // write the PID to the PID file
-        fd = open(pidfile_path, O_RDWR | O_CREAT, 0640);
-        if (fd < 0) {
-            flog(logfile, "unable to open PID file\n");
-            exit(EXIT_FAILURE);
-        }
-
-        snprintf(pidbuf, sizeof(pidbuf), "%d", getpid());
-        write(fd, pidbuf, strlen(pidbuf));
-        close(fd);
-    } else {
+    fd = open(pidfile_path, O_RDWR | O_CREAT, 0640);
+    if (fd < 0) {
         flog(logfile, "unable to open PID file\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if (flock(fd, LOCK_EX | LOCK_NB) != 0) {
+        flog(logfile, "process already running\n");
+        close(fd);
+        exit(EXIT_FAILURE);
+    }
+
+    char pidbuf[16] = {0};
+    if (ftruncate(fd, 0) != 0 || lseek(fd, 0, SEEK_SET) < 0 ||
+        snprintf(pidbuf, sizeof(pidbuf), "%d", getpid()) < 0 ||
+        write(fd, pidbuf, strlen(pidbuf)) != (ssize_t)strlen(pidbuf)) {
+        flog(logfile, "unable to write PID file\n");
+        close(fd);
         exit(EXIT_FAILURE);
     }
 
@@ -141,7 +129,6 @@ int
 main(int argc, char *argv[]) {
     logfile = stderr;
 
-    filter_t *filter_list = NULL;
     config_t config;
     memset(&config, 0, sizeof(config_t));
 
@@ -180,6 +167,7 @@ main(int argc, char *argv[]) {
             return 1;
         }
     }
+    (void)debug;
 
     // Default values for config
     config.mqtt_protocol_version = MQTT_PROTOCOL_V311;
@@ -225,6 +213,9 @@ main(int argc, char *argv[]) {
                 flog(logfile, "unable to load config file\n");
                 exit(EXIT_FAILURE);
             }
+        } else {
+            flog(logfile, "unable to load config file\n");
+            exit(EXIT_FAILURE);
         }
     }
 
@@ -247,7 +238,7 @@ main(int argc, char *argv[]) {
 
     if (verbose) {
         // print the loaded rules
-        flog_filter(logfile, filter_list);
+        flog_filter(logfile, config.head);
     }
 
     flog(logfile, "starting Open MQTT Modbus Gateway\n");
@@ -346,7 +337,7 @@ main(int argc, char *argv[]) {
     mosquitto_lib_cleanup();
 
     // close log file
-    if (logfile != NULL) {
+    if (logfile != NULL && logfile != stderr) {
         fclose(logfile);
     }
 

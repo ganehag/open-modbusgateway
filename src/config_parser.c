@@ -28,6 +28,11 @@
 
 uint32_t
 strto_uint32(const char *str, char **endptr, int base) {
+    if (str == NULL || *str == '\0') {
+        errno = EINVAL;
+        return UINT32_MAX;
+    }
+
     errno = 0;
     long value = strtol(str, endptr, base);
     if (errno != 0 || value < 0 || value > UINT32_MAX) {
@@ -458,18 +463,31 @@ parse_option_range(char *option_value, range_u32_t *list) {
             char *token_min = strtok(token, "-");
             char *token_max = strtok(NULL, "-");
 
+            if (token_min == NULL || token_max == NULL ||
+                strtok(NULL, "-") != NULL) {
+                return PARSE_RANGE_ERROR_INVALID_RANGE;
+            }
+
             errno = 0; // reset errno
-            uint32_t min = strto_uint32(token_min, NULL, 10);
+            char *end = NULL;
+            uint32_t min = strto_uint32(token_min, &end, 10);
             // check of overflow or underflow
             if (errno == ERANGE) {
                 return PARSE_RANGE_ERROR_OVERFLOW;
             }
+            if (errno != 0 || end == token_min || *end != '\0') {
+                return PARSE_RANGE_ERROR_INVALID_RANGE;
+            }
 
             errno = 0; // reset errno
-            uint32_t max = strto_uint32(token_max, NULL, 10);
+            end = NULL;
+            uint32_t max = strto_uint32(token_max, &end, 10);
             // check of overflow or underflow
             if (errno == ERANGE) {
                 return PARSE_RANGE_ERROR_OVERFLOW;
+            }
+            if (errno != 0 || end == token_max || *end != '\0') {
+                return PARSE_RANGE_ERROR_INVALID_RANGE;
             }
 
             // check for errors
@@ -488,10 +506,14 @@ parse_option_range(char *option_value, range_u32_t *list) {
             errno = 0; // reset errno
 
             // token is a single number
-            uint32_t number = strtoul(token, NULL, 10);
+            char *end = NULL;
+            uint32_t number = strto_uint32(token, &end, 10);
 
             // check for errors
-            if (errno != 0) {
+            if (errno == ERANGE) {
+                return PARSE_RANGE_ERROR_OVERFLOW;
+            }
+            if (errno != 0 || end == token || *end != '\0') {
                 return PARSE_RANGE_ERROR_INVALID_NUMBER;
             }
 
@@ -723,9 +745,9 @@ validate_config(config_t *config) {
         return -6;
     }
 
-    // if one of the tls options is set, then all of them must be set
-    if (strlen(config->ca_cert_path) > 0 || strlen(config->cert_path) > 0 ||
-        strlen(config->key_path) > 0) {
+    // A CA certificate enables server-only TLS. Client credentials are
+    // optional, but must be supplied together and require a CA certificate.
+    if (strlen(config->cert_path) > 0 || strlen(config->key_path) > 0) {
         if (strlen(config->ca_cert_path) == 0 ||
             strlen(config->cert_path) == 0 || strlen(config->key_path) == 0) {
             return -7;

@@ -170,9 +170,9 @@ config rule
   - `mqtt_protocol`: The MQTT protocol version to use. Must be either 3.1, 3.1.1, or 5.
   - `tls_version`: The TLS version to use. For OpenSSL >= 1.0.1, the available options are tlsv1.2, tlsv1.1, and tlsv1, with tlsv1.2 being the default. For OpenSSL < 1.0.1, the available options are tlsv1 and sslv3, with tlsv1 being the default.
   - `clean_session`: Whether to use a clean session for the MQTT connection. Must be either true or false.
-  - `ca_cert_path`: The path to the CA certificate file. If this option is not specified, the CA certificate will not be used.
-  - `cert_path`: The path to the certificate file. If this option is not specified, the certificate will not be used.
-  - `key_path`: The path to the key file. If this option is not specified, the key will not be used.
+  - `ca_cert_path`: The path to the CA certificate file. Set this to enable TLS with server certificate verification; it is required when using a client certificate.
+  - `cert_path`: Optional path to the client certificate file. It must be set together with `key_path`.
+  - `key_path`: Optional path to the client key file. It must be set together with `cert_path`.
   - `verify`: Whether to verify the server certificate. Should not be used in production.
   - `request_topic`: The topic used for receiving requests.
   - `response_topic`: The topic used to send responses.
@@ -188,9 +188,9 @@ config rule
   - `clean_session`: Whether to use a clean session for the MQTT connection. Must be either `true` or `false`.
   - `request_topic`: The topic used for receiving requests.
   - `response_topic`: The topic used to send responses.
-  - `ca_cert_path`: The path to the CA certificate file. If this option is not specified, the CA certificate will not be used.
-  - `cert_path`: The path to the certificate file. If this option is not specified, the certificate will not be used.
-  - `key_path`: The path to the key file. If this option is not specified, the key will not be used.
+  - `ca_cert_path`: The path to the CA certificate file. Set this to enable TLS with server certificate verification; it is required when using a client certificate.
+  - `cert_path`: Optional path to the client certificate file. It must be set together with `key_path`.
+  - `key_path`: Optional path to the client key file. It must be set together with `cert_path`.
 
 - `rule`: This section contains the settings for the Modbus communication filtering. It can appear multiple times in the config file. Each section has the following options:
   - `ip`: The IP address of the Modbus device, it must be an IPv6 address or an IPv4 address encoded in IPv6 format, and it must also include a subnet mask.

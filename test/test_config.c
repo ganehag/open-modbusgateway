@@ -226,6 +226,32 @@ test_validate_config_without_rules(void) {
 }
 
 void
+test_validate_config_tls_options(void) {
+    config_t config;
+    memset(&config, 0, sizeof(config));
+
+    strncpy(config.host, "127.0.0.1", sizeof(config.host) - 1);
+    config.port = 1883;
+    strncpy(config.client_id, "test-client", sizeof(config.client_id) - 1);
+    strncpy(config.request_topic, "request", sizeof(config.request_topic) - 1);
+    strncpy(
+        config.response_topic, "response", sizeof(config.response_topic) - 1);
+
+    strncpy(config.ca_cert_path, "ca.crt", sizeof(config.ca_cert_path) - 1);
+    CU_ASSERT_EQUAL(validate_config(&config), 0);
+
+    memset(config.ca_cert_path, 0, sizeof(config.ca_cert_path));
+    strncpy(config.cert_path, "client.crt", sizeof(config.cert_path) - 1);
+    CU_ASSERT_EQUAL(validate_config(&config), -7);
+
+    strncpy(config.ca_cert_path, "ca.crt", sizeof(config.ca_cert_path) - 1);
+    CU_ASSERT_EQUAL(validate_config(&config), -7);
+
+    strncpy(config.key_path, "client.key", sizeof(config.key_path) - 1);
+    CU_ASSERT_EQUAL(validate_config(&config), 0);
+}
+
+void
 test_config_file_parser_errors(void) {
     // create a temporary file
     FILE *file = tmpfile();
@@ -365,7 +391,17 @@ test_parse_option_range_errors(void) {
     // ensure we get an error of PARSE_RANGE_ERROR_MAX_RANGES
     CU_ASSERT_EQUAL(error, PARSE_RANGE_ERROR_MAX_RANGES);
 
-    char *options_invalid_range = "1, 2, 3, 4, 5, 6, 7, 8-9";
+    char options_missing_endpoint[] = "1-";
+    CU_ASSERT_EQUAL(parse_option_range(options_missing_endpoint, list),
+                    PARSE_RANGE_ERROR_INVALID_RANGE);
+
+    char options_extra_endpoint[] = "1-2-3";
+    CU_ASSERT_EQUAL(parse_option_range(options_extra_endpoint, list),
+                    PARSE_RANGE_ERROR_INVALID_RANGE);
+
+    char options_invalid_number[] = "12abc";
+    CU_ASSERT_EQUAL(parse_option_range(options_invalid_number, list),
+                    PARSE_RANGE_ERROR_INVALID_NUMBER);
 }
 
 void

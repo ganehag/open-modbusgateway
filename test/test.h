@@ -27,6 +27,7 @@ void test_parse_option_range_ok(void);
 void test_config_file_parser_errors(void);
 void test_parse_option_range_errors(void);
 void test_validate_config_without_rules(void);
+void test_validate_config_tls_options(void);
 
 void test_trim_functions(void);
 
@@ -36,5 +37,7 @@ void test_mqtt_format1_reject_extra_token(void);
 void test_mqtt_format1_missing_write_payload(void);
 void test_mqtt_format1_serial_filter_blocks(void);
 void test_mqtt_format1_serial_filter_allows(void);
+void test_mqtt_rejects_invalid_write_values(void);
+void test_mqtt_accepts_non_terminated_payload(void);
 
 #endif

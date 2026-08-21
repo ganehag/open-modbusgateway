@@ -67,7 +67,10 @@ ip_cidr_to_in6(const char *ip_cidr, iprange_t *range) {
         return IP_CIDR_INVALID_INPUT;
     }
 
-    char *ip = strdup(ip_cidr);
+    char ip[INET6_ADDRSTRLEN + 5];
+    if (snprintf(ip, sizeof(ip), "%s", ip_cidr) >= (int)sizeof(ip)) {
+        return IP_CIDR_INVALID_INPUT;
+    }
     char *slash = strchr(ip, '/'); // find the slash in the string
     if (slash == NULL) {
         return IP_CIDR_INVALID_INPUT;
