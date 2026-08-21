@@ -254,7 +254,8 @@ on_after_write_coil | on_after_write_register |
 on_after_write_coils | on_after_write_registers
 ```
 
-Before hooks receive a request table. They may change its `address`, `count`,
+Before hooks receive a request table. Its operation is in `function_code`.
+They may change its `address`, `count`,
 and (for reads and multi-value writes) `values`, or return `false, "reason"`
 to reject it. Endpoint, unit ID, function, and cookie remain gateway-controlled.
 The changed request is checked again against the configured filters. After hooks
@@ -263,8 +264,10 @@ reflected in the MQTT response.
 
 Before hooks can also call `gateway.read_registers(address, count)` and
 `gateway.write_registers(address, values)` for auxiliary work on the same
-target. These calls are subject to the same Modbus timeout and filters, and
-return `nil, error` on failure. Scripts also have `gateway.log(message)`. The
+target. Successful Modbus events include an opaque `target` descriptor that can
+be passed to `gateway.write_registers_to(target, address, values)` from a timer
+or lifecycle callback. These calls are subject to the same Modbus timeout and
+filters, and return `nil, error` on failure. Scripts also have `gateway.log(message)`. The
 `io`, `os`, `package`, and `debug` libraries are not loaded, dynamic script
 loading is disabled, and each callback has a fixed instruction budget. See
 `examples/automation.lua.example` for a complete starting point.

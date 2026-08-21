@@ -7,6 +7,7 @@
 #include "request.h"
 
 int automation_init(const char *script_path);
+void automation_set_config(const config_t *config);
 void automation_shutdown(void);
 int automation_emit_gateway_started(void);
 int automation_emit_gateway_stopping(void);

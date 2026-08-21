@@ -17,12 +17,22 @@
 #define AUTOMATION_INSTRUCTION_LIMIT 100000
 #define AUTOMATION_HOOK_INTERVAL 1000
 #define AUTOMATION_QUEUE_CAPACITY 64
+#define AUTOMATION_TARGET_CAPACITY 64
 
 static lua_State *automation_state;
 static int instruction_budget;
 static int64_t last_timer_ms;
 static const config_t *active_config;
 static const request_t *active_request;
+static const config_t *automation_config;
+
+typedef struct {
+    unsigned int id;
+    request_t request;
+} automation_target_t;
+
+static automation_target_t targets[AUTOMATION_TARGET_CAPACITY];
+static unsigned int next_target_id = 1;
 
 typedef struct {
     const char *handler;
@@ -64,6 +74,33 @@ automation_now_ms(void) {
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
     return (int64_t)now.tv_sec * 1000 + now.tv_nsec / 1000000;
+}
+
+static unsigned int
+automation_store_target(const request_t *request) {
+    for (size_t i = 0; i < AUTOMATION_TARGET_CAPACITY; i++) {
+        request_t *saved = &targets[i].request;
+        if (targets[i].id != 0 && saved->format == request->format &&
+            saved->slave_id == request->slave_id &&
+            ((request->format == 1 &&
+              strcmp(saved->serial_id, request->serial_id) == 0) ||
+             (request->format == 0 && saved->ip_type == request->ip_type &&
+              strcmp(saved->ip, request->ip) == 0 &&
+              strcmp(saved->port, request->port) == 0))) {
+            return targets[i].id;
+        }
+    }
+    size_t slot = (next_target_id - 1) % AUTOMATION_TARGET_CAPACITY;
+    targets[slot].id = next_target_id++;
+    targets[slot].request = *request;
+    return targets[slot].id;
+}
+
+static void
+automation_push_target(lua_State *state, const request_t *request) {
+    lua_newtable(state);
+    lua_pushinteger(state, automation_store_target(request));
+    lua_setfield(state, -2, "id");
 }
 
 static int
@@ -141,7 +178,7 @@ automation_emit(const char *handler,
         lua_pushinteger(automation_state, request->slave_id);
         lua_setfield(automation_state, -2, "slave_id");
         lua_pushinteger(automation_state, request->function);
-        lua_setfield(automation_state, -2, "function");
+        lua_setfield(automation_state, -2, "function_code");
         lua_pushinteger(automation_state, request->register_addr + 1);
         lua_setfield(automation_state, -2, "register_address");
         lua_pushinteger(automation_state, request->register_count);
@@ -161,6 +198,8 @@ automation_emit(const char *handler,
             lua_rawseti(automation_state, -2, i + 1);
         }
         lua_setfield(automation_state, -2, "values");
+        automation_push_target(automation_state, request);
+        lua_setfield(automation_state, -2, "target");
     }
 
     return automation_call(1);
@@ -176,7 +215,7 @@ automation_push_request(lua_State *state, const request_t *request) {
     lua_pushinteger(state, request->slave_id);
     lua_setfield(state, -2, "slave_id");
     lua_pushinteger(state, request->function);
-    lua_setfield(state, -2, "function");
+    lua_setfield(state, -2, "function_code");
     lua_pushinteger(state, request->register_addr + 1);
     lua_setfield(state, -2, "address");
     lua_pushinteger(state, request->register_count);
@@ -367,8 +406,9 @@ static modbus_t *
 automation_open_modbus(request_t *request) {
     request_t filter_request = *request;
     filter_request.register_addr++;
-    if (active_config == NULL ||
-        filter_match(active_config->head, &filter_request) != 0) {
+    const config_t *config =
+        active_config != NULL ? active_config : automation_config;
+    if (config == NULL || filter_match(config->head, &filter_request) != 0) {
         return NULL;
     }
 
@@ -483,6 +523,80 @@ lua_gateway_write_registers(lua_State *state) {
     return 1;
 }
 
+static int
+automation_request_from_target(lua_State *state,
+                               int index,
+                               request_t *request) {
+    if (automation_config == NULL || !lua_istable(state, index)) {
+        return -1;
+    }
+    lua_getfield(state, index, "id");
+    unsigned int id = (unsigned int)lua_tointeger(state, -1);
+    lua_pop(state, 1);
+    for (size_t i = 0; i < AUTOMATION_TARGET_CAPACITY; i++) {
+        if (targets[i].id == id) {
+            *request = targets[i].request;
+            request->timeout = automation_config->timeout;
+            return 0;
+        }
+    }
+    return -1;
+}
+
+static int
+lua_gateway_write_registers_to(lua_State *state) {
+    luaL_checktype(state, 1, LUA_TTABLE);
+    lua_Integer address = luaL_checkinteger(state, 2);
+    luaL_checktype(state, 3, LUA_TTABLE);
+    size_t count = lua_rawlen(state, 3);
+    if (address < 1 || address > 65536 || count == 0 || count > 123 ||
+        address + count - 1 > 65536) {
+        return luaL_error(state, "invalid Modbus write");
+    }
+
+    request_t request;
+    if (automation_request_from_target(state, 1, &request) != 0) {
+        return luaL_error(state, "invalid automation target");
+    }
+    request.function = 16;
+    request.register_addr = (uint32_t)address - 1;
+    request.register_count = (uint16_t)count;
+    for (size_t i = 0; i < count; i++) {
+        lua_rawgeti(state, 3, (int)i + 1);
+        if (!lua_isnumber(state, -1)) {
+            return luaL_error(state, "write values must be integers");
+        }
+        lua_Integer value = lua_tointeger(state, -1);
+        lua_pop(state, 1);
+        if (value < 0 || value > UINT16_MAX) {
+            return luaL_error(state, "write value is out of range");
+        }
+        request.data[i] = (uint16_t)value;
+    }
+
+    modbus_t *ctx = automation_open_modbus(&request);
+    if (ctx == NULL) {
+        lua_pushnil(state);
+        lua_pushstring(state,
+                       "auxiliary write was blocked or could not connect");
+        return 2;
+    }
+    int result = modbus_write_registers(
+        ctx, request.register_addr, request.register_count, request.data);
+    if (result == -1) {
+        const char *message = modbus_strerror(errno);
+        modbus_close(ctx);
+        modbus_free(ctx);
+        lua_pushnil(state);
+        lua_pushstring(state, message);
+        return 2;
+    }
+    modbus_close(ctx);
+    modbus_free(ctx);
+    lua_pushboolean(state, 1);
+    return 1;
+}
+
 int
 automation_intercept_request(const config_t *config,
                              request_t *request,
@@ -530,6 +644,8 @@ automation_init(const char *script_path) {
     event_queue_tail = 0;
     pthread_mutex_unlock(&event_queue_mutex);
     last_timer_ms = 0;
+    memset(targets, 0, sizeof(targets));
+    next_target_id = 1;
 
     automation_lua_requiref(automation_state, "_G", luaopen_base, 1);
     lua_pop(automation_state, 1);
@@ -551,6 +667,8 @@ automation_init(const char *script_path) {
     lua_setfield(automation_state, -2, "read_registers");
     lua_pushcfunction(automation_state, lua_gateway_write_registers);
     lua_setfield(automation_state, -2, "write_registers");
+    lua_pushcfunction(automation_state, lua_gateway_write_registers_to);
+    lua_setfield(automation_state, -2, "write_registers_to");
     lua_setglobal(automation_state, "gateway");
 
     if (luaL_loadfile(automation_state, script_path) != LUA_OK ||
@@ -564,11 +682,17 @@ automation_init(const char *script_path) {
 }
 
 void
+automation_set_config(const config_t *config) {
+    automation_config = config;
+}
+
+void
 automation_shutdown(void) {
     if (automation_state != NULL) {
         lua_close(automation_state);
         automation_state = NULL;
     }
+    automation_config = NULL;
 }
 
 int

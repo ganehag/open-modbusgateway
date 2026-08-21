@@ -80,7 +80,7 @@ test_automation_request_hooks(void) {
         "  request.count = 2\n"
         "end\n"
         "function on_before_read_registers(request)\n"
-        "  if request.function ~= 3 then error('wrong request') end\n"
+        "  if request.function_code ~= 3 then error('wrong request') end\n"
         "end\n"
         "function on_after_read_registers(response)\n"
         "  response.values[1] = 99\n"

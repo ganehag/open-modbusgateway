@@ -31,3 +31,36 @@ end
 function on_after_read_registers(response)
     -- response.values[1] = response.values[1] * 10
 end
+
+-- Reset register 401 thirty minutes after its last successful external write.
+-- The target descriptor comes from the gateway and cannot bypass filters.
+local watched_register = 401
+local reset_value = 0
+local inactivity_ms = 30 * 60 * 1000
+local last_write_ms
+local reset_target
+
+function on_modbus_succeeded(event)
+    local count = event.function_code == 6 and 1 or event.register_count
+    if (event.function_code == 6 or event.function_code == 16)
+       and event.register_address <= watched_register
+       and watched_register < event.register_address + count then
+        last_write_ms = event.timestamp_ms
+        reset_target = event.target
+    end
+end
+
+function on_timer(event)
+    if not reset_target or not last_write_ms
+       or event.timestamp_ms - last_write_ms < inactivity_ms then
+        return
+    end
+
+    -- Clear first so a failed reset does not retry every second.
+    last_write_ms = nil
+    local ok, err = gateway.write_registers_to(
+        reset_target, watched_register, { reset_value })
+    if not ok then
+        gateway.log("inactivity reset failed: " .. err)
+    end
+end

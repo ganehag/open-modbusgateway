@@ -32,8 +32,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "config_parser.h"
 #include "automation.h"
+#include "config_parser.h"
 #include "filters.h"
 #include "log.h"
 #include "mqtt_client.h"
@@ -231,6 +231,7 @@ main(int argc, char *argv[]) {
         flog(logfile, "unable to initialize automation\n");
         exit(EXIT_FAILURE);
     }
+    automation_set_config(&config);
 
     if (daemon) {
         if (daemonize() != 0) {
