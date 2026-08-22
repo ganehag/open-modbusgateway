@@ -49,9 +49,13 @@ void test_mqtt_rejects_invalid_tcp_address(void);
 void test_mqtt_rejects_malformed_numeric_fields(void);
 void test_mqtt_parser_malformed_input_smoke(void);
 
+#ifdef HAVE_LUA_AUTOMATION
 void test_automation_callbacks(void);
 void test_automation_instruction_limit(void);
 void test_automation_memory_limit(void);
 void test_automation_request_hooks(void);
+#else
+void test_automation_disabled(void);
+#endif
 
 #endif

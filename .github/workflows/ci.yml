@@ -25,7 +25,7 @@ jobs:
           sudo apt-get install -y autoconf automake libtool pkg-config
           libcunit1-dev libmodbus-dev libmosquitto-dev ${{ matrix.package }}
       - run: autoreconf -fi
-      - run: ./configure --prefix=/usr
+      - run: ./configure --enable-lua --prefix=/usr
       - run: make check
 
   sanitizer:
@@ -38,7 +38,7 @@ jobs:
           libcunit1-dev libmodbus-dev libmosquitto-dev liblua5.4-dev
       - run: autoreconf -fi
       - run: >-
-          ./configure --prefix=/usr
+          ./configure --enable-lua --prefix=/usr
           CFLAGS='-std=c11 -g -O1 -fno-omit-frame-pointer -fsanitize=address,undefined'
           LDFLAGS='-fsanitize=address,undefined'
       - run: make check
@@ -52,7 +52,7 @@ jobs:
           sudo apt-get install -y autoconf automake libtool pkg-config gcovr
           libcunit1-dev libmodbus-dev libmosquitto-dev liblua5.4-dev
       - run: autoreconf -fi
-      - run: ./configure --prefix=/usr
+      - run: ./configure --enable-lua --prefix=/usr
       - run: make coverage
       - uses: actions/upload-artifact@v4
         with:
@@ -69,5 +69,17 @@ jobs:
           mosquitto mosquitto-clients libmodbus-dev libmosquitto-dev
           libcunit1-dev liblua5.4-dev
       - run: autoreconf -fi
-      - run: ./configure --prefix=/usr
+      - run: ./configure --enable-lua --prefix=/usr
       - run: make integration-check
+
+  unit_without_lua:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update
+      - run: >-
+          sudo apt-get install -y autoconf automake libtool pkg-config
+          libcunit1-dev libmodbus-dev libmosquitto-dev
+      - run: autoreconf -fi
+      - run: ./configure --disable-lua --prefix=/usr
+      - run: make check

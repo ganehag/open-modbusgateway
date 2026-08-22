@@ -206,16 +206,24 @@ Scripts may use `gateway.read_registers(address, count)`,
 `gateway.write_registers_to(target, address, values)` for permitted auxiliary
 work. See `examples/automation.lua.example` for an inactivity-reset example.
 
-The Lua environment does not expose `io`, `os`, `package`, or `debug`; dynamic
-script loading is disabled. Callbacks have an instruction budget and the Lua
-state has a 1 MiB memory limit.
+Lua automation is a build-time option: pass `--enable-lua` to `configure`.
+Without it, the gateway has no Lua runtime dependency and refuses a configured
+automation script at startup. The Lua environment does not expose `io`, `os`,
+`package`, or `debug`; dynamic script loading is disabled. Callbacks have an
+instruction budget and the Lua state has a 1 MiB memory limit.
 
 ## OpenWrt
 
-The `openwrt/` directory contains the package recipe. Copy it into an OpenWrt
-source tree under `package/utils/open-modbusgateway`, select the package in
-`make menuconfig`, and build it with:
+The `openwrt/` directory contains the package recipe. It uses OpenWrt's
+Autotools support, builds the daemon without its host-only CUnit suite, and
+installs the binary, UCI configuration, and procd service. Its **Lua automation
+support** package option adds the Lua dependency and passes `--enable-lua`.
+Copy the *contents* of `openwrt/` into an OpenWrt source tree under
+`package/utils/open-modbusgateway`, select the package in `make menuconfig`,
+and build it with:
 
 ```sh
+mkdir -p package/utils/open-modbusgateway
+cp -a /path/to/open-modbusgateway/openwrt/. package/utils/open-modbusgateway/
 make package/open-modbusgateway/compile V=s
 ```

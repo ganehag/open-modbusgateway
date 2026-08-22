@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include "test.h"
 
 int
@@ -107,6 +109,7 @@ main() {
                 "test_mqtt_parser_malformed_input_smoke",
                 test_mqtt_parser_malformed_input_smoke);
 
+#ifdef HAVE_LUA_AUTOMATION
     CU_pSuite suite6 = CU_add_suite("Automation", NULL, NULL);
     CU_add_test(suite6, "test_automation_callbacks", test_automation_callbacks);
     CU_add_test(suite6,
@@ -116,6 +119,10 @@ main() {
         suite6, "test_automation_memory_limit", test_automation_memory_limit);
     CU_add_test(
         suite6, "test_automation_request_hooks", test_automation_request_hooks);
+#else
+    CU_pSuite suite6 = CU_add_suite("Automation disabled", NULL, NULL);
+    CU_add_test(suite6, "test_automation_disabled", test_automation_disabled);
+#endif
 
     CU_basic_set_mode(CU_BRM_VERBOSE);
     CU_basic_run_tests();
