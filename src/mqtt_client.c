@@ -323,41 +323,7 @@ mqtt_message_callback(struct mosquitto *mosq,
         }
     }
 
-    if (req->register_addr == 0 || req->register_addr > 65536 ||
-        req->timeout == 0 || req->timeout > 999 || req->slave_id == 0) {
-        error = MQTT_INVALID_REQUEST;
-        goto cleanup;
-    }
-
-    // Validate inputs common to both formats
-    if (req->function != 1 && req->function != 2 && req->function != 3 &&
-        req->function != 4 && req->function != 5 && req->function != 6 &&
-        req->function != 15 && req->function != 16) {
-        error = MQTT_INVALID_REQUEST;
-        flog(logfile, "invalid function call in request\n");
-        goto cleanup;
-    }
-
-    if ((req->function >= 1 && req->function <= 4) &&
-        (req->register_count == 0 || req->register_count > 125)) {
-        error = MQTT_INVALID_REQUEST;
-        goto cleanup;
-    }
-
-    if ((req->function == 15 || req->function == 16) &&
-        (req->register_count == 0 || req->register_count > 123)) {
-        error = MQTT_INVALID_REQUEST;
-        flog(logfile, "overflow register count in request\n");
-        goto cleanup;
-    }
-
-    if (req->function == 5 && req->register_count > 1) {
-        error = MQTT_INVALID_REQUEST;
-        goto cleanup;
-    }
-
-    if ((req->function <= 4 || req->function == 15 || req->function == 16) &&
-        req->register_addr + req->register_count - 1 > 65536) {
+    if (request_validate_modbus(req, 1) != 0) {
         error = MQTT_INVALID_REQUEST;
         goto cleanup;
     }
@@ -439,14 +405,7 @@ mqtt_message_callback(struct mosquitto *mosq,
         config, req, automation_reason, sizeof(automation_reason));
     request_t filter_request = *req;
     filter_request.register_addr++;
-    if (automation_result != 0 || req->register_addr > 65535 ||
-        ((req->function >= 1 && req->function <= 4) &&
-         (req->register_count == 0 || req->register_count > 125)) ||
-        ((req->function == 15 || req->function == 16) &&
-         (req->register_count == 0 || req->register_count > 123)) ||
-        (req->function == 5 && req->register_count > 1) ||
-        ((req->function <= 4 || req->function == 15 || req->function == 16) &&
-         req->register_addr + req->register_count > 65536) ||
+    if (automation_result != 0 || request_validate_modbus(req, 0) != 0 ||
         filter_match(config->head, &filter_request) != 0) {
         error = MQTT_ERROR_MESSAGE;
         const char *message = automation_reason[0] != '\0'

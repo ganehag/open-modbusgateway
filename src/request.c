@@ -107,6 +107,46 @@ request_set_inflight_limit(unsigned int limit) {
     pthread_mutex_unlock(&request_count_mutex);
 }
 
+int
+request_validate_modbus(const request_t *request, int one_based_address) {
+    if (request == NULL || request->timeout == 0 || request->timeout > 999 ||
+        request->slave_id == 0 || request->slave_id > 247 ||
+        (one_based_address && request->register_addr == 0) ||
+        request->register_addr > (one_based_address ? 65536U : 65535U)) {
+        return -1;
+    }
+
+    if (request->function != 1 && request->function != 2 &&
+        request->function != 3 && request->function != 4 &&
+        request->function != 5 && request->function != 6 &&
+        request->function != 15 && request->function != 16) {
+        return -1;
+    }
+
+    if (request->function >= 1 && request->function <= 4) {
+        if (request->register_count == 0 || request->register_count > 125) {
+            return -1;
+        }
+    } else if (request->function == 15 || request->function == 16) {
+        if (request->register_count == 0 || request->register_count > 123) {
+            return -1;
+        }
+    } else if (request->function == 5 && request->register_count > 1) {
+        return -1;
+    }
+
+    if (request->function <= 4 || request->function == 15 ||
+        request->function == 16) {
+        uint32_t last_address =
+            request->register_addr + request->register_count - 1;
+        if (last_address > (one_based_address ? 65536U : 65535U)) {
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
 void
 request_thread_release(void) {
     pthread_mutex_lock(&request_count_mutex);

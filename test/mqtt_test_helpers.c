@@ -36,6 +36,15 @@ request_transport_unlock(const request_t *request) {
     (void)request;
 }
 
+int
+request_validate_modbus(const request_t *request, int one_based_address) {
+    if (request == NULL || request->timeout == 0 || request->slave_id == 0 ||
+        (one_based_address && request->register_addr == 0)) {
+        return -1;
+    }
+    return 0;
+}
+
 void
 mqtt_test_reset(void) {
     publish_count = 0;

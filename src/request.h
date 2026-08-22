@@ -50,5 +50,6 @@ int request_wait_for_completion(unsigned int timeout_ms);
 void request_set_inflight_limit(unsigned int limit);
 void request_transport_lock(const request_t *request);
 void request_transport_unlock(const request_t *request);
+int request_validate_modbus(const request_t *request, int one_based_address);
 
 #endif

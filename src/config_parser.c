@@ -144,6 +144,18 @@ parse_bool_option(const char *value, uint8_t *parsed) {
     return -1;
 }
 
+static int
+copy_config_value(char *destination,
+                  size_t destination_size,
+                  const char *value) {
+    size_t length = strlen(value);
+    if (length >= destination_size) {
+        return -1;
+    }
+    memcpy(destination, value, length + 1);
+    return 0;
+}
+
 int
 config_parse_file(FILE *file, config_t *config) {
     char line[MAX_LINE_LEN];
@@ -277,8 +289,10 @@ config_parse_file(FILE *file, config_t *config) {
             if (in_config_rule) {
                 uint32_t number = 0;
                 if (strcmp(name, "ip") == 0) {
-                    // copy ip to config.ip
-                    strncpy(rule.ip, value, sizeof(rule.ip));
+                    if (copy_config_value(rule.ip, sizeof(rule.ip), value) !=
+                        0) {
+                        return CONFIG_PARSER_ERROR_INVALID_IP;
+                    }
                 } else if (strcmp(name, "port") == 0) {
                     // parse_option_port has the following signature:
                     int parse_error = parse_option_range(value, rule.port);
@@ -302,23 +316,34 @@ config_parse_file(FILE *file, config_t *config) {
                         return CONFIG_PARSER_ERROR_INVALID_REGISTER_ADDRESS;
                     }
                 } else if (strcmp(name, "serial_id") == 0) {
-                    strncpy(rule.serial_id, value, sizeof(rule.serial_id));
-                    rule.serial_id[sizeof(rule.serial_id) - 1] = '\0';
+                    if (copy_config_value(rule.serial_id,
+                                          sizeof(rule.serial_id),
+                                          value) != 0) {
+                        return CONFIG_PARSER_ERROR;
+                    }
                 } else {
                     return CONFIG_PARSER_ERROR;
                 }
             } else if (in_config_serial_gateway) {
                 uint32_t number = 0;
                 if (strcmp(name, "id") == 0) {
-                    strncpy(
-                        serial_gateway.id, value, sizeof(serial_gateway.id));
+                    if (copy_config_value(serial_gateway.id,
+                                          sizeof(serial_gateway.id),
+                                          value) != 0) {
+                        return CONFIG_PARSER_ERROR_INVALID_SERIAL_GATEWAY;
+                    }
                 } else if (strcmp(name, "device") == 0) {
-                    strncpy(serial_gateway.device,
-                            value,
-                            sizeof(serial_gateway.device));
+                    if (copy_config_value(serial_gateway.device,
+                                          sizeof(serial_gateway.device),
+                                          value) != 0) {
+                        return CONFIG_PARSER_ERROR_INVALID_SERIAL_GATEWAY;
+                    }
                 } else if (strcmp(name, "ip") == 0) {
-                    strncpy(
-                        serial_gateway.ip, value, sizeof(serial_gateway.ip));
+                    if (copy_config_value(serial_gateway.ip,
+                                          sizeof(serial_gateway.ip),
+                                          value) != 0) {
+                        return CONFIG_PARSER_ERROR_INVALID_SERIAL_GATEWAY;
+                    }
                 } else if (strcmp(name, "port") == 0) {
                     if (parse_uint_option(value, 0, UINT16_MAX, &number) != 0) {
                         return CONFIG_PARSER_ERROR_INVALID_SERIAL_GATEWAY;
@@ -362,9 +387,11 @@ config_parse_file(FILE *file, config_t *config) {
                 }
             } else if (in_config_automation) {
                 if (strcmp(name, "script") == 0) {
-                    strncpy(config->automation_script,
-                            value,
-                            sizeof(config->automation_script) - 1);
+                    if (copy_config_value(config->automation_script,
+                                          sizeof(config->automation_script),
+                                          value) != 0) {
+                        return CONFIG_PARSER_ERROR;
+                    }
                 } else {
                     return CONFIG_PARSER_ERROR;
                 }
