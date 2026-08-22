@@ -23,6 +23,7 @@
 
 #include <ctype.h>
 #include <errno.h>
+#include <limits.h>
 #include <regex.h>
 #include <stdlib.h>
 #include <string.h>
@@ -115,6 +116,34 @@ strsep_ws(char **stringp) {
     return begin;
 }
 
+static int
+parse_uint_option(const char *value,
+                  uint32_t minimum,
+                  uint32_t maximum,
+                  uint32_t *parsed) {
+    char *end = NULL;
+    uint32_t number = strto_uint32(value, &end, 10);
+    if (errno != 0 || end == value || *end != '\0' || number < minimum ||
+        number > maximum) {
+        return -1;
+    }
+    *parsed = number;
+    return 0;
+}
+
+static int
+parse_bool_option(const char *value, uint8_t *parsed) {
+    if (strcmp(value, "true") == 0 || strcmp(value, "1") == 0) {
+        *parsed = 1;
+        return 0;
+    }
+    if (strcmp(value, "false") == 0 || strcmp(value, "0") == 0) {
+        *parsed = 0;
+        return 0;
+    }
+    return -1;
+}
+
 int
 config_parse_file(FILE *file, config_t *config) {
     char line[MAX_LINE_LEN];
@@ -141,17 +170,18 @@ config_parse_file(FILE *file, config_t *config) {
 
         // remove everything else after # by replacing it with null byte
         line[strcspn(line, "#")] = 0;
+        char *row = trim(line, strlen(line));
 
         // check for start of config rule, a rule is a type and config is the
         // accepted type
-        if (strncmp(line, "config rule", 11) == 0) {
+        if (strcmp(row, "config rule") == 0) {
             in_config_rule = 1;
             in_config = 1;
             memset(&rule, 0, sizeof(rule_t)); // clear config struct
             continue;
         }
 
-        if (strncmp(line, "config serial_gateway", 21) == 0) {
+        if (strcmp(row, "config serial_gateway") == 0) {
             in_config_serial_gateway = 1;
             in_config = 1;
             memset(&serial_gateway, 0, sizeof(serial_gateway_t));
@@ -162,14 +192,14 @@ config_parse_file(FILE *file, config_t *config) {
             continue;
         }
 
-        if (strncmp(line, "config automation", 17) == 0) {
+        if (strcmp(row, "config automation") == 0) {
             in_config_automation = 1;
             in_config = 1;
             continue;
         }
 
         // check for end of config rule
-        if (in_config_rule && line[0] == '\0') {
+        if (in_config_rule && row[0] == '\0') {
             handle_filter_row(config, &rule);
 
             in_config_rule = 0;
@@ -177,7 +207,7 @@ config_parse_file(FILE *file, config_t *config) {
             continue;
         }
 
-        if (in_config_serial_gateway && line[0] == '\0') {
+        if (in_config_serial_gateway && row[0] == '\0') {
             int sg_error = handle_serial_gateway_row(config, &serial_gateway);
             if (sg_error != 0) {
                 return sg_error;
@@ -189,48 +219,51 @@ config_parse_file(FILE *file, config_t *config) {
 
         // check for start of config mqtt, a rule is a type and config is the
         // accepted type
-        if (strncmp(line, "config mqtt", 11) == 0) {
+        if (strcmp(row, "config mqtt") == 0) {
             in_config_mqtt = 1;
             in_config = 1;
-            // FIXME: clear config struct for mqtt
             continue;
         }
 
+        if (strncmp(row, "config ", 7) == 0) {
+            return CONFIG_PARSER_ERROR;
+        }
+
         // check for end of config mqtt
-        if (in_config_mqtt && line[0] == '\0') {
+        if (in_config_mqtt && row[0] == '\0') {
             in_config_mqtt = 0;
             in_config = 0;
             continue;
         }
 
-        if (in_config_automation && line[0] == '\0') {
+        if (in_config_automation && row[0] == '\0') {
             in_config_automation = 0;
             in_config = 0;
             continue;
         }
 
         // skip empty lines in a safe way
-        if (line[0] == 0) {
+        if (row[0] == 0) {
             continue;
         }
 
         // parse option
         if (in_config) {
-            char *opt_line = trim(line, strlen(line));
+            char *opt_line = row;
             char *opt = strsep_ws(&opt_line);
             char *name = strsep_ws(&opt_line);
             char *value = opt_line;
 
             if (opt == NULL || name == NULL || value == NULL) {
-                continue;
+                return CONFIG_PARSER_ERROR;
             }
 
             // trim option
             opt = trim(opt, strlen(opt));
 
             // ensure this is a valid option element
-            if (strncmp(opt, "option", 6) != 0) {
-                continue; // skip this line
+            if (strcmp(opt, "option") != 0) {
+                return CONFIG_PARSER_ERROR;
             }
 
             name = trim(name, strlen(name));
@@ -242,99 +275,114 @@ config_parse_file(FILE *file, config_t *config) {
             value = trim_token(value, '"', strlen(value));
 
             if (in_config_rule) {
-                if (strncmp(name, "ip", 2) == 0) {
+                uint32_t number = 0;
+                if (strcmp(name, "ip") == 0) {
                     // copy ip to config.ip
                     strncpy(rule.ip, value, sizeof(rule.ip));
-                } else if (strncmp(name, "port", 4) == 0) {
+                } else if (strcmp(name, "port") == 0) {
                     // parse_option_port has the following signature:
                     int parse_error = parse_option_range(value, rule.port);
                     if (parse_error != 0) {
                         return CONFIG_PARSER_ERROR_INVALID_PORT;
                     }
-                } else if (strncmp(name, "slave_id", 8) == 0) {
-                    rule.slave_id = atoi(value);
-                } else if (strncmp(name, "function", 8) == 0) {
-                    rule.function = atoi(value);
-                } else if (strncmp(name, "register_address", 16) == 0) {
+                } else if (strcmp(name, "slave_id") == 0) {
+                    if (parse_uint_option(value, 1, 247, &number) != 0) {
+                        return CONFIG_PARSER_ERROR_INVALID_SLAVE_ID;
+                    }
+                    rule.slave_id = (uint8_t)number;
+                } else if (strcmp(name, "function") == 0) {
+                    if (parse_uint_option(value, 1, UINT8_MAX, &number) != 0) {
+                        return CONFIG_PARSER_ERROR_INVALID_FUNCTION_CODE;
+                    }
+                    rule.function = (uint8_t)number;
+                } else if (strcmp(name, "register_address") == 0) {
                     int parse_error =
                         parse_option_range(value, rule.register_addr);
                     if (parse_error != 0) {
                         return CONFIG_PARSER_ERROR_INVALID_REGISTER_ADDRESS;
                     }
-                } else if (strncmp(name, "serial_id", 9) == 0) {
+                } else if (strcmp(name, "serial_id") == 0) {
                     strncpy(rule.serial_id, value, sizeof(rule.serial_id));
                     rule.serial_id[sizeof(rule.serial_id) - 1] = '\0';
+                } else {
+                    return CONFIG_PARSER_ERROR;
                 }
             } else if (in_config_serial_gateway) {
-                if (strncmp(name, "id", 2) == 0) {
+                uint32_t number = 0;
+                if (strcmp(name, "id") == 0) {
                     strncpy(
                         serial_gateway.id, value, sizeof(serial_gateway.id));
-                } else if (strncmp(name, "device", 6) == 0) {
+                } else if (strcmp(name, "device") == 0) {
                     strncpy(serial_gateway.device,
                             value,
                             sizeof(serial_gateway.device));
-                } else if (strncmp(name, "ip", 2) == 0) {
+                } else if (strcmp(name, "ip") == 0) {
                     strncpy(
                         serial_gateway.ip, value, sizeof(serial_gateway.ip));
-                } else if (strncmp(name, "port", 4) == 0) {
-                    errno = 0;
-                    long parsed_port = strtol(value, NULL, 10);
-                    if (errno != 0 || parsed_port < 0 || parsed_port > 65535) {
+                } else if (strcmp(name, "port") == 0) {
+                    if (parse_uint_option(value, 0, UINT16_MAX, &number) != 0) {
                         return CONFIG_PARSER_ERROR_INVALID_SERIAL_GATEWAY;
                     }
-                    serial_gateway.port = (uint16_t)parsed_port;
-                } else if (strncmp(name, "baudrate", 8) == 0) {
-                    int parsed_baud = atoi(value);
-                    if (parsed_baud <= 0) {
+                    serial_gateway.port = (uint16_t)number;
+                } else if (strcmp(name, "baudrate") == 0) {
+                    if (parse_uint_option(value, 1, INT_MAX, &number) != 0) {
                         return CONFIG_PARSER_ERROR_INVALID_SERIAL_GATEWAY;
                     }
-                    serial_gateway.baudrate = parsed_baud;
-                } else if (strncmp(name, "parity", 6) == 0) {
+                    serial_gateway.baudrate = (int)number;
+                } else if (strcmp(name, "parity") == 0) {
                     char parity = toupper((unsigned char)value[0]);
-                    if (strncmp(value, "none", 4) == 0) {
+                    if (strcmp(value, "none") == 0) {
                         parity = 'N';
-                    } else if (strncmp(value, "even", 4) == 0) {
+                    } else if (strcmp(value, "even") == 0) {
                         parity = 'E';
-                    } else if (strncmp(value, "odd", 3) == 0) {
+                    } else if (strcmp(value, "odd") == 0) {
                         parity = 'O';
                     }
                     if (parity != 'N' && parity != 'E' && parity != 'O') {
                         return CONFIG_PARSER_ERROR_INVALID_SERIAL_GATEWAY;
                     }
                     serial_gateway.parity = parity;
-                } else if (strncmp(name, "stop_bits", 9) == 0) {
-                    int parsed_stop = atoi(value);
-                    if (parsed_stop != 1 && parsed_stop != 2) {
+                } else if (strcmp(name, "stop_bits") == 0) {
+                    if (parse_uint_option(value, 1, 2, &number) != 0) {
                         return CONFIG_PARSER_ERROR_INVALID_SERIAL_GATEWAY;
                     }
-                    serial_gateway.stop_bits = parsed_stop;
-                } else if (strncmp(name, "data_bits", 9) == 0) {
-                    int parsed_data = atoi(value);
-                    if (parsed_data < 5 || parsed_data > 8) {
+                    serial_gateway.stop_bits = (int)number;
+                } else if (strcmp(name, "data_bits") == 0) {
+                    if (parse_uint_option(value, 5, 8, &number) != 0) {
                         return CONFIG_PARSER_ERROR_INVALID_SERIAL_GATEWAY;
                     }
-                    serial_gateway.data_bits = parsed_data;
-                } else if (strncmp(name, "slave_id", 8) == 0) {
-                    int parsed_slave = atoi(value);
-                    if (parsed_slave < 0 || parsed_slave > 247) {
+                    serial_gateway.data_bits = (int)number;
+                } else if (strcmp(name, "slave_id") == 0) {
+                    if (parse_uint_option(value, 0, 247, &number) != 0) {
                         return CONFIG_PARSER_ERROR_INVALID_SERIAL_GATEWAY;
                     }
-                    serial_gateway.slave_id = (uint8_t)parsed_slave;
+                    serial_gateway.slave_id = (uint8_t)number;
+                } else {
+                    return CONFIG_PARSER_ERROR;
                 }
             } else if (in_config_automation) {
-                if (strncmp(name, "script", 6) == 0) {
+                if (strcmp(name, "script") == 0) {
                     strncpy(config->automation_script,
                             value,
                             sizeof(config->automation_script) - 1);
+                } else {
+                    return CONFIG_PARSER_ERROR;
                 }
             } else if (in_config_mqtt) {
                 // MQTT config options
-                if (strncmp(name, "host", 4) == 0) {
+                uint32_t number = 0;
+                if (strcmp(name, "host") == 0) {
                     strncpy(config->host, value, sizeof(config->host));
-                } else if (strncmp(name, "port", 4) == 0) {
-                    config->port = atoi(value);
-                } else if (strncmp(name, "keepalive", 9) == 0) {
-                    config->keepalive = atoi(value);
+                } else if (strcmp(name, "port") == 0) {
+                    if (parse_uint_option(value, 1, UINT16_MAX, &number) != 0) {
+                        return CONFIG_PARSER_ERROR_INVALID_PORT;
+                    }
+                    config->port = (uint16_t)number;
+                } else if (strcmp(name, "keepalive") == 0) {
+                    if (parse_uint_option(value, 1, UINT16_MAX, &number) != 0) {
+                        return CONFIG_PARSER_ERROR;
+                    }
+                    config->keepalive = (uint16_t)number;
                 } else if (strcmp(name, "max_inflight_requests") == 0) {
                     char *end = NULL;
                     uint32_t limit = strto_uint32(value, &end, 10);
@@ -343,32 +391,33 @@ config_parse_file(FILE *file, config_t *config) {
                         return CONFIG_PARSER_ERROR;
                     }
                     config->max_inflight_requests = (uint16_t)limit;
-                } else if (strncmp(name, "username", 8) == 0) {
+                } else if (strcmp(name, "username") == 0) {
                     strncpy(config->username, value, sizeof(config->username));
-                } else if (strncmp(name, "password", 8) == 0) {
+                } else if (strcmp(name, "password") == 0) {
                     strncpy(config->password, value, sizeof(config->password));
-                } else if (strncmp(name, "client_id", 9) == 0) {
+                } else if (strcmp(name, "client_id") == 0) {
                     strncpy(
                         config->client_id, value, sizeof(config->client_id));
-                } else if (strncmp(name, "qos", 3) == 0) {
-                    config->qos = atoi(value);
-                } else if (strncmp(name, "retain", 6) == 0) {
-                    if (strncmp(value, "true", 4) == 0 ||
-                        strncmp(value, "1", 1) == 0) {
-                        config->retain = 1;
-                    } else if (strncmp(value, "false", 5) == 0 ||
-                               strncmp(value, "0", 1) == 0) {
-                        config->retain = 0;
+                } else if (strcmp(name, "qos") == 0) {
+                    if (parse_uint_option(value, 0, 2, &number) != 0) {
+                        return CONFIG_PARSER_ERROR;
                     }
-                } else if (strncmp(name, "mqtt_protocol", 13) == 0) {
-                    if (strncmp(value, "3.1", 3) == 0) {
+                    config->qos = (uint8_t)number;
+                } else if (strcmp(name, "retain") == 0) {
+                    if (parse_bool_option(value, &config->retain) != 0) {
+                        return CONFIG_PARSER_ERROR;
+                    }
+                } else if (strcmp(name, "mqtt_protocol") == 0) {
+                    if (strcmp(value, "3.1") == 0) {
                         config->mqtt_protocol_version = MQTT_PROTOCOL_V31;
-                    } else if (strncmp(value, "3.1.1", 5) == 0) {
+                    } else if (strcmp(value, "3.1.1") == 0) {
                         config->mqtt_protocol_version = MQTT_PROTOCOL_V311;
-                    } else if (strncmp(value, "5", 1) == 0) {
+                    } else if (strcmp(value, "5") == 0) {
                         config->mqtt_protocol_version = MQTT_PROTOCOL_V5;
+                    } else {
+                        return CONFIG_PARSER_ERROR;
                     }
-                } else if (strncmp(name, "tls_version", 11) == 0) {
+                } else if (strcmp(name, "tls_version") == 0) {
                     if (strcmp(value, "tlsv1.2") != 0) {
                         return CONFIG_PARSER_ERROR_INVALID_TLS_VERSION;
                     }
@@ -377,44 +426,39 @@ config_parse_file(FILE *file, config_t *config) {
                             value,
                             sizeof(config->tls_version));
 
-                } else if (strncmp(name, "clean_session", 13) == 0) {
-                    if (strncmp(value, "true", 4) == 0 ||
-                        strncmp(value, "1", 1) == 0) {
-                        config->clean_session = 1;
-                    } else if (strncmp(value, "false", 5) == 0 ||
-                               strncmp(value, "0", 1) == 0) {
-                        config->clean_session = 0;
+                } else if (strcmp(name, "clean_session") == 0) {
+                    if (parse_bool_option(value, &config->clean_session) != 0) {
+                        return CONFIG_PARSER_ERROR;
                     }
-                } else if (strncmp(name, "ca_cert_path", 12) == 0) {
+                } else if (strcmp(name, "ca_cert_path") == 0) {
                     // server certificate
                     strncpy(config->ca_cert_path,
                             value,
                             sizeof(config->ca_cert_path));
-                } else if (strncmp(name, "cert_path", 9) == 0) {
+                } else if (strcmp(name, "cert_path") == 0) {
                     // client certificate
                     strncpy(
                         config->cert_path, value, sizeof(config->cert_path));
-                } else if (strncmp(name, "key_path", 8) == 0) {
+                } else if (strcmp(name, "key_path") == 0) {
                     // client key
                     strncpy(config->key_path, value, sizeof(config->key_path));
-                } else if (strncmp(name, "verify_ca_cert", 14) == 0) {
+                } else if (strcmp(name, "verify_ca_cert") == 0) {
                     // verify the server certificate
                     // should not be used in production
-                    if (strncmp(value, "true", 4) == 0 ||
-                        strncmp(value, "1", 1) == 0) {
-                        config->verify_ca_cert = 1;
-                    } else if (strncmp(value, "false", 5) == 0 ||
-                               strncmp(value, "0", 1) == 0) {
-                        config->verify_ca_cert = 0;
+                    if (parse_bool_option(value, &config->verify_ca_cert) !=
+                        0) {
+                        return CONFIG_PARSER_ERROR;
                     }
-                } else if (strncmp(name, "request_topic", 13) == 0) {
+                } else if (strcmp(name, "request_topic") == 0) {
                     strncpy(config->request_topic,
                             value,
                             sizeof(config->request_topic));
-                } else if (strncmp(name, "response_topic", 14) == 0) {
+                } else if (strcmp(name, "response_topic") == 0) {
                     strncpy(config->response_topic,
                             value,
                             sizeof(config->response_topic));
+                } else {
+                    return CONFIG_PARSER_ERROR;
                 }
             }
         }

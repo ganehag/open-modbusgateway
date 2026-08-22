@@ -291,6 +291,58 @@ test_config_parses_request_limit(void) {
 }
 
 void
+test_config_rejects_unknown_or_malformed_options(void) {
+    FILE *file = tmpfile();
+    CU_ASSERT_PTR_NOT_NULL_FATAL(file);
+
+    fprintf(file,
+            "config mqtt\n"
+            "\toption port_extra '1883'\n");
+    rewind(file);
+
+    config_t config;
+    memset(&config, 0, sizeof(config));
+    CU_ASSERT_EQUAL(config_parse_file(file, &config), CONFIG_PARSER_ERROR);
+    fclose(file);
+
+    file = tmpfile();
+    CU_ASSERT_PTR_NOT_NULL_FATAL(file);
+    fprintf(file,
+            "config mqtt\n"
+            "\toption port '1883oops'\n");
+    rewind(file);
+    memset(&config, 0, sizeof(config));
+    CU_ASSERT_EQUAL(config_parse_file(file, &config),
+                    CONFIG_PARSER_ERROR_INVALID_PORT);
+    fclose(file);
+}
+
+void
+test_config_parser_malformed_input_smoke(void) {
+    unsigned int state = 0x12345678U;
+    char input[96];
+
+    for (size_t iteration = 0; iteration < 128; iteration++) {
+        for (size_t i = 0; i < sizeof(input) - 1; i++) {
+            state = state * 1103515245U + 12345U;
+            input[i] = (char)(32 + (state % 95));
+        }
+        input[sizeof(input) - 1] = '\0';
+
+        FILE *file = tmpfile();
+        CU_ASSERT_PTR_NOT_NULL_FATAL(file);
+        fputs(input, file);
+        rewind(file);
+
+        config_t config;
+        memset(&config, 0, sizeof(config));
+        (void)config_parse_file(file, &config);
+        config_free_lists(&config);
+        fclose(file);
+    }
+}
+
+void
 test_config_file_parser_errors(void) {
     // create a temporary file
     FILE *file = tmpfile();

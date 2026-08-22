@@ -332,3 +332,33 @@ test_mqtt_rejects_malformed_numeric_fields(void) {
     CU_ASSERT_PTR_NOT_NULL(
         strstr(mqtt_test_last_payload(), "906 ERROR: INVALID REQUEST"));
 }
+
+void
+test_mqtt_parser_malformed_input_smoke(void) {
+    silence_logs();
+
+    config_t config;
+    serial_gateway_t gateway;
+    setup_basic_config(&config, &gateway);
+
+    unsigned int state = 0x87654321U;
+    char payload[96];
+    for (size_t iteration = 0; iteration < 256; iteration++) {
+        for (size_t i = 0; i < sizeof(payload) - 1; i++) {
+            state = state * 1664525U + 1013904223U;
+            payload[i] = (char)(32 + (state % 95));
+        }
+        payload[sizeof(payload) - 1] = '\0';
+
+        mqtt_test_reset();
+        struct mosquitto_message msg = {
+            .payload = payload,
+            .payloadlen = (int)strlen(payload),
+            .topic = "request",
+        };
+        mqtt_message_callback(NULL, &config, &msg);
+        request_t *captured = mqtt_test_captured_request();
+        free(captured);
+        mqtt_test_release_captured_request();
+    }
+}

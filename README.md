@@ -129,6 +129,10 @@ The config file is used to specify the settings for the application. The file mu
 The file is divided into sections, each section starts with a `config` keyword followed by the name of the section.
 Each section contains multiple options, each option is specified on a new line and starts with the `option` keyword followed by the name of the option and its value.
 
+Section and option names are exact. Unknown names, malformed numeric values,
+and invalid boolean values cause configuration loading to fail rather than being
+silently ignored.
+
 ```text
 config <section_name>
 	option <option_name> '<option_value>'

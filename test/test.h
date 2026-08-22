@@ -32,6 +32,8 @@ void test_validate_config_without_rules(void);
 void test_validate_config_tls_options(void);
 void test_config_rejects_legacy_tls(void);
 void test_config_parses_request_limit(void);
+void test_config_rejects_unknown_or_malformed_options(void);
+void test_config_parser_malformed_input_smoke(void);
 
 void test_trim_functions(void);
 
@@ -45,6 +47,7 @@ void test_mqtt_rejects_invalid_write_values(void);
 void test_mqtt_accepts_non_terminated_payload(void);
 void test_mqtt_rejects_invalid_tcp_address(void);
 void test_mqtt_rejects_malformed_numeric_fields(void);
+void test_mqtt_parser_malformed_input_smoke(void);
 
 void test_automation_callbacks(void);
 void test_automation_instruction_limit(void);
