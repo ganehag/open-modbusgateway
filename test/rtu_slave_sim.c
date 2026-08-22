@@ -3,6 +3,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 static volatile sig_atomic_t running = 1;
 
@@ -28,6 +29,11 @@ main(int argc, char **argv) {
     int data_bits = (argc > 4) ? atoi(argv[4]) : 8;
     int stop_bits = (argc > 5) ? atoi(argv[5]) : 1;
     int slave_id = (argc > 6) ? atoi(argv[6]) : 1;
+    int reply_delay_ms = (argc > 7) ? atoi(argv[7]) : 0;
+    if (reply_delay_ms < 0) {
+        fprintf(stderr, "reply delay must not be negative\n");
+        return EXIT_FAILURE;
+    }
 
     modbus_t *ctx = modbus_new_rtu(device, baud, parity, data_bits, stop_bits);
     if (ctx == NULL) {
@@ -71,6 +77,13 @@ main(int argc, char **argv) {
     while (running) {
         int rc = modbus_receive(ctx, query);
         if (rc > 0) {
+            if (reply_delay_ms > 0) {
+                struct timespec delay = {
+                    .tv_sec = reply_delay_ms / 1000,
+                    .tv_nsec = (long)(reply_delay_ms % 1000) * 1000000L,
+                };
+                nanosleep(&delay, NULL);
+            }
             if (modbus_reply(ctx, query, rc, mb_mapping) == -1) {
                 break;
             }

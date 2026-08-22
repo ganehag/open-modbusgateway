@@ -299,3 +299,36 @@ test_mqtt_rejects_invalid_tcp_address(void) {
     CU_ASSERT_PTR_NOT_NULL(
         strstr(mqtt_test_last_payload(), "905 ERROR: INVALID REQUEST"));
 }
+
+void
+test_mqtt_rejects_malformed_numeric_fields(void) {
+    silence_logs();
+    mqtt_test_reset();
+
+    config_t config;
+    serial_gateway_t gateway;
+    setup_basic_config(&config, &gateway);
+
+    const char *overflow_address = "1 905 ttyusb0 5 7 3 4294967296 1";
+    struct mosquitto_message msg = make_message(overflow_address);
+    mqtt_message_callback(NULL, &config, &msg);
+    CU_ASSERT_PTR_NULL(mqtt_test_captured_request());
+    CU_ASSERT_PTR_NOT_NULL(
+        strstr(mqtt_test_last_payload(), "905 ERROR: INVALID REQUEST"));
+
+    mqtt_test_reset();
+    const char *overflow_cookie = "1 18446744073709551616 ttyusb0 5 7 3 1 1";
+    msg = make_message(overflow_cookie);
+    mqtt_message_callback(NULL, &config, &msg);
+    CU_ASSERT_PTR_NULL(mqtt_test_captured_request());
+    CU_ASSERT_PTR_NOT_NULL(
+        strstr(mqtt_test_last_payload(), "0 ERROR: INVALID REQUEST"));
+
+    mqtt_test_reset();
+    const char *trailing_field = "1 906 ttyusb0 5 7 3 1 1 unexpected extra";
+    msg = make_message(trailing_field);
+    mqtt_message_callback(NULL, &config, &msg);
+    CU_ASSERT_PTR_NULL(mqtt_test_captured_request());
+    CU_ASSERT_PTR_NOT_NULL(
+        strstr(mqtt_test_last_payload(), "906 ERROR: INVALID REQUEST"));
+}

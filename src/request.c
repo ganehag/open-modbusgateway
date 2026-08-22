@@ -35,6 +35,7 @@
 #include "request.h"
 
 uint16_t request_count = 0;
+static unsigned int request_limit = DEFAULT_MAX_INFLIGHT_REQUESTS;
 pthread_mutex_t request_count_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t request_count_cond = PTHREAD_COND_INITIALIZER;
 
@@ -86,13 +87,24 @@ request_thread_reserve(void) {
     int reserved = 0;
 
     pthread_mutex_lock(&request_count_mutex);
-    if (request_count < MAX_REQUEST_THREADS) {
+    if (request_count < request_limit) {
         request_count++;
         reserved = 1;
     }
     pthread_mutex_unlock(&request_count_mutex);
 
     return reserved;
+}
+
+void
+request_set_inflight_limit(unsigned int limit) {
+    if (limit == 0) {
+        return;
+    }
+
+    pthread_mutex_lock(&request_count_mutex);
+    request_limit = limit;
+    pthread_mutex_unlock(&request_count_mutex);
 }
 
 void

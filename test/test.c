@@ -60,6 +60,9 @@ main() {
     CU_add_test(suite3,
                 "test_config_rejects_legacy_tls",
                 test_config_rejects_legacy_tls);
+    CU_add_test(suite3,
+                "test_config_parses_request_limit",
+                test_config_parses_request_limit);
 
     CU_pSuite suite4 = CU_add_suite("Trim functions", NULL, NULL);
     CU_add_test(suite4, "test_trim_functions", test_trim_functions);
@@ -91,6 +94,9 @@ main() {
     CU_add_test(suite5,
                 "test_mqtt_rejects_invalid_tcp_address",
                 test_mqtt_rejects_invalid_tcp_address);
+    CU_add_test(suite5,
+                "test_mqtt_rejects_malformed_numeric_fields",
+                test_mqtt_rejects_malformed_numeric_fields);
 
     CU_pSuite suite6 = CU_add_suite("Automation", NULL, NULL);
     CU_add_test(suite6, "test_automation_callbacks", test_automation_callbacks);

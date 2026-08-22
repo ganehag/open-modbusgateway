@@ -94,6 +94,7 @@ typedef struct {
 
     uint16_t timeout;
     uint16_t reconnect_delay;
+    uint16_t max_inflight_requests;
 
     // tls stuff
     char ca_cert_path[256];

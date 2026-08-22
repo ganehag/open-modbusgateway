@@ -39,7 +39,7 @@ echo "[INFO] Building RTU slave simulator"
 gcc -o "$TMPDIR/rtu_slave_sim" "$ROOT_DIR/test/rtu_slave_sim.c" -lmodbus
 
 echo "[INFO] Starting RTU slave simulator on $SLAVE_DEV"
-"$TMPDIR/rtu_slave_sim" "$SLAVE_DEV" 115200 E 8 1 3 \
+"$TMPDIR/rtu_slave_sim" "$SLAVE_DEV" 115200 E 8 1 3 100 \
     &> "$TMPDIR/rtu_slave.log" &
 SLAVE_PID=$!
 CLEANUP_CMDS+=("kill $SLAVE_PID >/dev/null 2>&1 || true")
@@ -152,6 +152,35 @@ if [[ "$RESPONSE" != "$EXPECTED" ]]; then
 fi
 
 echo "[INFO] Integration test passed: $RESPONSE"
+
+CONCURRENT_RESPONSE_FILE="$TMPDIR/concurrent_responses.txt"
+echo "[INFO] Verifying concurrent RTU requests are serialized"
+timeout 20 mosquitto_sub -h 127.0.0.1 -p "$PORT" -t response -C 4 \
+    > "$CONCURRENT_RESPONSE_FILE" &
+CONCURRENT_SUB_PID=$!
+CLEANUP_CMDS+=("kill $CONCURRENT_SUB_PID >/dev/null 2>&1 || true")
+sleep 1
+CONCURRENT_PUBLISH_PIDS=()
+for CONCURRENT_COOKIE in 123456793 123456794 123456795 123456796; do
+    mosquitto_pub -h 127.0.0.1 -p "$PORT" -t request \
+        -m "1 $CONCURRENT_COOKIE $SERIAL_ID 5 3 3 1 2" &
+    CONCURRENT_PUBLISH_PIDS+=("$!")
+done
+for CONCURRENT_PUBLISH_PID in "${CONCURRENT_PUBLISH_PIDS[@]}"; do
+    wait "$CONCURRENT_PUBLISH_PID"
+done
+if ! wait "$CONCURRENT_SUB_PID"; then
+    echo "[ERROR] Timed out waiting for concurrent RTU responses."
+    exit 1
+fi
+for CONCURRENT_COOKIE in 123456793 123456794 123456795 123456796; do
+    if ! grep -qx "$CONCURRENT_COOKIE OK 100 200" "$CONCURRENT_RESPONSE_FILE"; then
+        echo "[ERROR] Missing successful response for concurrent request $CONCURRENT_COOKIE"
+        cat "$CONCURRENT_RESPONSE_FILE"
+        exit 1
+    fi
+done
+echo "[INFO] Concurrent RTU serialization test passed"
 
 RESET_WRITE_COOKIE=123456791
 RESET_WRITE_FILE="$TMPDIR/reset_write.txt"

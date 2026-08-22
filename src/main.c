@@ -182,6 +182,7 @@ main(int argc, char *argv[]) {
     config.port = 1883;
     config.timeout = 10;
     config.reconnect_delay = 5;
+    config.max_inflight_requests = DEFAULT_MAX_INFLIGHT_REQUESTS;
     config.verify_ca_cert = 1; // verify server certificate
     strncpy(config.host, "localhost", sizeof(config.host) - 1);
     strncpy(config.request_topic, "request", sizeof(config.request_topic) - 1);
@@ -230,6 +231,7 @@ main(int argc, char *argv[]) {
         flog(logfile, "invalid format of config file (%d)\n", err);
         exit(EXIT_FAILURE);
     }
+    request_set_inflight_limit(config.max_inflight_requests);
 
     if (automation_init(config.automation_script) != 0) {
         flog(logfile, "unable to initialize automation\n");

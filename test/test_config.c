@@ -274,6 +274,23 @@ test_config_rejects_legacy_tls(void) {
 }
 
 void
+test_config_parses_request_limit(void) {
+    FILE *file = tmpfile();
+    CU_ASSERT_PTR_NOT_NULL_FATAL(file);
+
+    fprintf(file,
+            "config mqtt\n"
+            "\toption max_inflight_requests '7'\n");
+    rewind(file);
+
+    config_t config;
+    memset(&config, 0, sizeof(config));
+    CU_ASSERT_EQUAL(config_parse_file(file, &config), 0);
+    CU_ASSERT_EQUAL(config.max_inflight_requests, 7);
+    fclose(file);
+}
+
+void
 test_config_file_parser_errors(void) {
     // create a temporary file
     FILE *file = tmpfile();

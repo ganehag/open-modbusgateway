@@ -22,7 +22,9 @@
 #endif
 
 #include <arpa/inet.h>
+#include <ctype.h>
 #include <errno.h>
+#include <limits.h>
 #include <mosquitto.h>
 #include <pthread.h>
 #include <stdbool.h>
@@ -70,6 +72,134 @@ is_valid_request_port(const char *port) {
            value <= UINT16_MAX;
 }
 
+static int
+parse_unsigned_field(const char *field,
+                     unsigned long long minimum,
+                     unsigned long long maximum,
+                     unsigned long long *value) {
+    if (field == NULL || field[0] == '\0' ||
+        strspn(field, "0123456789") != strlen(field)) {
+        return -1;
+    }
+
+    char *end = NULL;
+    errno = 0;
+    unsigned long long parsed = strtoull(field, &end, 10);
+    if (errno != 0 || end == field || *end != '\0' || parsed < minimum ||
+        parsed > maximum) {
+        return -1;
+    }
+    *value = parsed;
+    return 0;
+}
+
+static int
+parse_request_fields(char *buffer,
+                     request_t *request,
+                     char **serial_token,
+                     char **raw_registers,
+                     bool *has_value_block) {
+    char *fields[12] = {0};
+    size_t field_count = 0;
+    char *cursor = buffer;
+
+    while (*cursor != '\0') {
+        while (isspace((unsigned char)*cursor)) {
+            cursor++;
+        }
+        if (*cursor == '\0') {
+            break;
+        }
+        if (field_count == sizeof(fields) / sizeof(fields[0])) {
+            return -1;
+        }
+        fields[field_count++] = cursor;
+        while (*cursor != '\0' && !isspace((unsigned char)*cursor)) {
+            cursor++;
+        }
+        if (*cursor != '\0') {
+            *cursor++ = '\0';
+        }
+    }
+
+    unsigned long long value = 0;
+    if (field_count == 0 ||
+        parse_unsigned_field(fields[0], 0, 1, &value) != 0) {
+        return -1;
+    }
+    request->format = (uint8_t)value;
+
+    if (field_count < 2 ||
+        parse_unsigned_field(fields[1], 0, ULLONG_MAX, &request->cookie) != 0) {
+        return -1;
+    }
+
+    size_t required_fields = request->format == 0 ? 10 : 8;
+    size_t maximum_fields = required_fields + 1;
+    if (field_count < required_fields || field_count > maximum_fields) {
+        return -1;
+    }
+    *has_value_block = field_count == maximum_fields;
+
+    if (request->format == 0) {
+        if (parse_unsigned_field(fields[2], 0, 2, &value) != 0) {
+            return -1;
+        }
+        request->ip_type = (uint8_t)value;
+        if (strlen(fields[3]) >= sizeof(request->ip) ||
+            strlen(fields[4]) >= sizeof(request->port) ||
+            parse_unsigned_field(fields[5], 1, 999, &value) != 0) {
+            return -1;
+        }
+        strcpy(request->ip, fields[3]);
+        strcpy(request->port, fields[4]);
+        request->timeout = (uint16_t)value;
+        if (parse_unsigned_field(fields[6], 1, 247, &value) != 0) {
+            return -1;
+        }
+        request->slave_id = (uint8_t)value;
+        if (parse_unsigned_field(fields[7], 1, UINT8_MAX, &value) != 0) {
+            return -1;
+        }
+        request->function = (uint8_t)value;
+        if (parse_unsigned_field(fields[8], 1, 65536, &value) != 0) {
+            return -1;
+        }
+        request->register_addr = (uint32_t)value;
+        if (parse_unsigned_field(fields[9], 0, UINT16_MAX, &value) != 0) {
+            return -1;
+        }
+        request->register_count = (uint16_t)value;
+        *raw_registers = *has_value_block ? fields[10] : NULL;
+    } else {
+        if (strlen(fields[2]) >= sizeof(request->serial_id) ||
+            parse_unsigned_field(fields[3], 1, 999, &value) != 0) {
+            return -1;
+        }
+        *serial_token = fields[2];
+        request->timeout = (uint16_t)value;
+        if (parse_unsigned_field(fields[4], 1, 247, &value) != 0) {
+            return -1;
+        }
+        request->slave_id = (uint8_t)value;
+        if (parse_unsigned_field(fields[5], 1, UINT8_MAX, &value) != 0) {
+            return -1;
+        }
+        request->function = (uint8_t)value;
+        if (parse_unsigned_field(fields[6], 1, 65536, &value) != 0) {
+            return -1;
+        }
+        request->register_addr = (uint32_t)value;
+        if (parse_unsigned_field(fields[7], 0, UINT16_MAX, &value) != 0) {
+            return -1;
+        }
+        request->register_count = (uint16_t)value;
+        *raw_registers = *has_value_block ? fields[8] : NULL;
+    }
+
+    return 0;
+}
+
 void
 mqtt_message_callback(struct mosquitto *mosq,
                       void *obj,
@@ -82,9 +212,6 @@ mqtt_message_callback(struct mosquitto *mosq,
     pthread_t ptid;
     request_t *req = calloc(1, sizeof(request_t));
     char *buffer = NULL;
-    int num_args = 0;
-    int min_args = 0;
-    int max_args = 0;
     bool has_value_block = false;
 
     if (req == NULL) {
@@ -106,66 +233,14 @@ mqtt_message_callback(struct mosquitto *mosq,
 
     memcpy(buffer, message->payload, (size_t)message->payloadlen);
 
-    char raw_registers[1024];
-    memset(raw_registers, 0, sizeof(raw_registers));
-
-    char serial_token[sizeof(req->serial_id)];
-    memset(serial_token, 0, sizeof(serial_token));
-
-    if (sscanf(buffer, "%hhu", &req->format) != 1) {
+    char *raw_registers = NULL;
+    char *serial_token = NULL;
+    if (parse_request_fields(
+            buffer, req, &serial_token, &raw_registers, &has_value_block) !=
+        0) {
         error = MQTT_INVALID_REQUEST;
         goto cleanup;
     }
-
-    switch (req->format) {
-    case 0:
-        num_args = sscanf(buffer,
-                          "%hhu %llu %hhu %63s %7s %hu %hhu %hhu %u %hu %1023s",
-                          &req->format,
-                          &req->cookie,
-                          &req->ip_type,
-                          (char *)req->ip,
-                          (char *)&req->port,
-                          &req->timeout,
-                          &req->slave_id,
-                          &req->function,
-                          &req->register_addr,
-                          &req->register_count,
-                          raw_registers);
-        min_args = 10;
-        max_args = 11;
-        break;
-    case 1:
-        num_args = sscanf(buffer,
-                          "%hhu %llu %63s %hu %hhu %hhu %u %hu %1023s",
-                          &req->format,
-                          &req->cookie,
-                          serial_token,
-                          &req->timeout,
-                          &req->slave_id,
-                          &req->function,
-                          &req->register_addr,
-                          &req->register_count,
-                          raw_registers);
-        min_args = 8;
-        max_args = 9;
-        break;
-    default:
-        error = MQTT_INVALID_REQUEST;
-        goto cleanup;
-    }
-
-    if (num_args < min_args) {
-        error = MQTT_INVALID_REQUEST;
-        goto cleanup;
-    }
-
-    if (num_args != min_args && num_args != max_args) {
-        error = MQTT_INVALID_REQUEST;
-        goto cleanup;
-    }
-
-    has_value_block = (num_args == max_args);
 
 #ifdef DEBUG
     if (req->format == 0) {
@@ -181,7 +256,7 @@ mqtt_message_callback(struct mosquitto *mosq,
              req->function,
              req->register_addr,
              req->register_count,
-             raw_registers);
+             raw_registers != NULL ? raw_registers : "");
     } else {
         flog(logfile,
              "format 1 parsed: %hhu %llu %s %hu %hhu %hhu %u %hu %s\n",
@@ -193,17 +268,17 @@ mqtt_message_callback(struct mosquitto *mosq,
              req->function,
              req->register_addr,
              req->register_count,
-             raw_registers);
+             raw_registers != NULL ? raw_registers : "");
     }
 #endif
 
     if (req->format == 1) {
-        if (serial_token[0] == '\0') {
+        if (serial_token == NULL || serial_token[0] == '\0') {
             error = MQTT_INVALID_REQUEST;
             goto cleanup;
         }
 
-        char serial_copy[sizeof(serial_token)];
+        char serial_copy[sizeof(req->serial_id)];
         strncpy(serial_copy, serial_token, sizeof(serial_copy));
         serial_copy[sizeof(serial_copy) - 1] = '\0';
 
@@ -316,7 +391,8 @@ mqtt_message_callback(struct mosquitto *mosq,
             goto cleanup;
         }
 
-        if (parse_register_values(raw_registers, req) != 0) {
+        if (raw_registers == NULL ||
+            parse_register_values(raw_registers, req) != 0) {
             flog(logfile, "invalid register values supplied\n");
             error = MQTT_INVALID_REQUEST;
             goto cleanup;
@@ -389,7 +465,7 @@ mqtt_message_callback(struct mosquitto *mosq,
                          config->response_topic,
                          req->cookie,
                          error,
-                         "Too many requests");
+                         "request capacity reached");
         automation_emit_request_rejected(req->cookie, error);
         free(req);
         goto done;

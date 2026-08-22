@@ -168,6 +168,7 @@ config rule
   - `host`: The hostname or IP address of the MQTT broker.
   - `port`: The port number of the MQTT broker.
   - `keepalive`: The keepalive interval in seconds.
+  - `max_inflight_requests`: Maximum concurrent Modbus transactions. Excess MQTT requests receive an immediate capacity error; the default is `20`.
   - `username`: The username for the MQTT broker.
   - `password`: The password for the MQTT broker.
   - `client_id`: The client ID for the MQTT connection.

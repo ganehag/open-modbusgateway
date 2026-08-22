@@ -335,6 +335,14 @@ config_parse_file(FILE *file, config_t *config) {
                     config->port = atoi(value);
                 } else if (strncmp(name, "keepalive", 9) == 0) {
                     config->keepalive = atoi(value);
+                } else if (strcmp(name, "max_inflight_requests") == 0) {
+                    char *end = NULL;
+                    uint32_t limit = strto_uint32(value, &end, 10);
+                    if (errno != 0 || end == value || *end != '\0' ||
+                        limit == 0 || limit > UINT16_MAX) {
+                        return CONFIG_PARSER_ERROR;
+                    }
+                    config->max_inflight_requests = (uint16_t)limit;
                 } else if (strncmp(name, "username", 8) == 0) {
                     strncpy(config->username, value, sizeof(config->username));
                 } else if (strncmp(name, "password", 8) == 0) {
