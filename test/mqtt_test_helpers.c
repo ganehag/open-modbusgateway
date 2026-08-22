@@ -27,6 +27,16 @@ void
 request_thread_release(void) {}
 
 void
+request_transport_lock(const request_t *request) {
+    (void)request;
+}
+
+void
+request_transport_unlock(const request_t *request) {
+    (void)request;
+}
+
+void
 mqtt_test_reset(void) {
     publish_count = 0;
     memset(last_topic, 0, sizeof(last_topic));
@@ -75,6 +85,18 @@ mosquitto_subscribe(struct mosquitto *mosq,
     (void)sub;
     (void)qos;
     return MOSQ_ERR_SUCCESS;
+}
+
+const char *
+mosquitto_strerror(int mosq_errno) {
+    (void)mosq_errno;
+    return "mock MQTT error";
+}
+
+const char *
+mosquitto_connack_string(int connack_code) {
+    (void)connack_code;
+    return "mock connection rejected";
 }
 
 int

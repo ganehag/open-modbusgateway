@@ -25,6 +25,9 @@ main() {
     CU_add_test(suite2,
                 "test_filter_match_without_filters",
                 test_filter_match_without_filters);
+    CU_add_test(suite2,
+                "test_filter_match_rejects_range_overrun",
+                test_filter_match_rejects_range_overrun);
     CU_add_test(suite2, "test_filter_match_serial", test_filter_match_serial);
     CU_add_test(
         suite2, "test_multiple_filters_match", test_multiple_filters_match);
@@ -54,6 +57,9 @@ main() {
     CU_add_test(suite3,
                 "test_validate_config_tls_options",
                 test_validate_config_tls_options);
+    CU_add_test(suite3,
+                "test_config_rejects_legacy_tls",
+                test_config_rejects_legacy_tls);
 
     CU_pSuite suite4 = CU_add_suite("Trim functions", NULL, NULL);
     CU_add_test(suite4, "test_trim_functions", test_trim_functions);
@@ -98,7 +104,8 @@ main() {
 
     CU_basic_set_mode(CU_BRM_VERBOSE);
     CU_basic_run_tests();
+    unsigned int failures = CU_get_number_of_failures();
     CU_cleanup_registry();
 
-    return 0;
+    return failures == 0 ? 0 : 1;
 }

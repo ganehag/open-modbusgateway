@@ -187,7 +187,7 @@ main(int argc, char *argv[]) {
     strncpy(config.request_topic, "request", sizeof(config.request_topic) - 1);
     strncpy(
         config.response_topic, "response", sizeof(config.response_topic) - 1);
-    strncpy(config.tls_version, "tlsv1.1", sizeof(config.tls_version) - 1);
+    strncpy(config.tls_version, "tlsv1.2", sizeof(config.tls_version) - 1);
     sprintf(config.client_id, "openmmg_client_%d", getpid());
 
     if (configfile == NULL) {
@@ -341,8 +341,13 @@ main(int argc, char *argv[]) {
             if (run && rc) {
                 flog(logfile, "connection error: %s\n", mosquitto_strerror(rc));
                 automation_emit_mqtt_disconnected(mosquitto_strerror(rc));
-                sleep(10);
-                mosquitto_reconnect(mosq);
+                sleep(config.reconnect_delay);
+                rc = mosquitto_reconnect(mosq);
+                if (rc != MOSQ_ERR_SUCCESS) {
+                    flog(logfile,
+                         "reconnect error: %s\n",
+                         mosquitto_strerror(rc));
+                }
             }
         }
     terminate:;

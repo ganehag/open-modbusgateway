@@ -74,6 +74,7 @@ test_mqtt_format1_slave_override(void) {
     serial_gateway_t gateway;
     setup_basic_config(&config, &gateway);
     gateway.slave_id = 17;
+    add_serial_filter(&config, "ttyusb0", 17, 3, 0, 65535);
 
     const char *payload = "1 42 ttyusb0 5 9 3 10 2";
     struct mosquitto_message msg = make_message(payload);
@@ -108,6 +109,7 @@ test_mqtt_format1_no_override(void) {
     serial_gateway_t gateway;
     setup_basic_config(&config, &gateway);
     gateway.slave_id = 0; // allow payload value
+    add_serial_filter(&config, "ttyusb0", 12, 4, 0, 65535);
 
     const char *payload = "1 99 ttyusb0 5 12 4 20 3";
     struct mosquitto_message msg = make_message(payload);
@@ -131,6 +133,7 @@ test_mqtt_format1_reject_extra_token(void) {
     config_t config;
     serial_gateway_t gateway;
     setup_basic_config(&config, &gateway);
+
     gateway.slave_id = 5;
 
     const char *payload = "1 123 ttyusb0:override 5 9 3 10 2";
@@ -153,6 +156,7 @@ test_mqtt_format1_missing_write_payload(void) {
     config_t config;
     serial_gateway_t gateway;
     setup_basic_config(&config, &gateway);
+    add_serial_filter(&config, "ttyusb0", 7, 3, 0, 65535);
 
     const char *payload = "1 555 ttyusb0 5 7 16 30 2";
     struct mosquitto_message msg = make_message(payload);
@@ -249,6 +253,7 @@ test_mqtt_accepts_non_terminated_payload(void) {
     config_t config;
     serial_gateway_t gateway;
     setup_basic_config(&config, &gateway);
+    add_serial_filter(&config, "ttyusb0", 7, 3, 0, 65535);
 
     char payload[] = {'1', ' ', '9', '0', '3', ' ', 't', 't',
                       'y', 'u', 's', 'b', '0', ' ', '5', ' ',

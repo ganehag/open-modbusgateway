@@ -107,6 +107,12 @@ To get around this, the gateway has built-in checks to filter out messages. A me
 
 - CIDR check: the IP address of the request target must be within the specified CIDR range.
 - Port check: the port number of the request target must be within the specified range.
+- Register-range check: the complete requested span, not only its starting register, must fit an allowed rule.
+
+The gateway is deny-by-default: every TCP or serial request needs a matching
+`config rule`. Rules for one transport do not authorize the other transport.
+Serial RTU transactions targeting the same device are serialized so that frames
+cannot collide on a shared bus.
 - Slave ID check: the slave ID of the request must match the specified slave ID.
 - Function check: the Modbus function of the request must match and be only one of the following: 1, 2, 3, 4, 5, 6, 15 or 16.
 - Register number check: the register number must be within the specified range.
@@ -168,7 +174,7 @@ config rule
   - `qos`: The quality of service for the MQTT connection. Must be either 0, 1 or 2.
   - `retain`: Whether to retain the MQTT messages. Must be either true or false.
   - `mqtt_protocol`: The MQTT protocol version to use. Must be either 3.1, 3.1.1, or 5.
-  - `tls_version`: The TLS version to use. For OpenSSL >= 1.0.1, the available options are tlsv1.2, tlsv1.1, and tlsv1, with tlsv1.2 being the default. For OpenSSL < 1.0.1, the available options are tlsv1 and sslv3, with tlsv1 being the default.
+  - `tls_version`: The TLS version to use. Use `tlsv1.2` or newer where supported.
   - `clean_session`: Whether to use a clean session for the MQTT connection. Must be either true or false.
   - `ca_cert_path`: The path to the CA certificate file. Set this to enable TLS with server certificate verification; it is required when using a client certificate.
   - `cert_path`: Optional path to the client certificate file. It must be set together with `key_path`.
@@ -208,7 +214,7 @@ config rule
   - `stop_bits`: `1` or `2`.
   - `slave_id`: Optional fixed slave ID; when set, requests inherit this value.
   - Optional `ip`/`port` fields can document the TCP side of a gateway deployment.
-  - `config rule` sections are optional; if none are present the gateway allows TCP requests without additional filtering.
+  - At least one matching `config rule` is required for every request. A serial-only rule does not permit TCP requests, and a TCP-only rule does not permit serial requests.
 
 ### Integration Test Harness
 

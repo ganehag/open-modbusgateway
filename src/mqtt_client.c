@@ -197,14 +197,6 @@ mqtt_message_callback(struct mosquitto *mosq,
     }
 #endif
 
-    if (req->format == 0) {
-        if (filter_match(config->head, req) != 0) {
-            error = MQTT_MESSAGE_BLOCKED;
-            flog(logfile, "request blocked {%s}\n", buffer);
-            goto cleanup;
-        }
-    }
-
     if (req->format == 1) {
         if (serial_token[0] == '\0') {
             error = MQTT_INVALID_REQUEST;
@@ -252,12 +244,6 @@ mqtt_message_callback(struct mosquitto *mosq,
                  "unexpected serial override for gateway id '%s'\n",
                  req->serial_id);
             error = MQTT_INVALID_REQUEST;
-            goto cleanup;
-        }
-
-        if (filter_match(config->head, req) != 0) {
-            error = MQTT_MESSAGE_BLOCKED;
-            flog(logfile, "request blocked {%s}\n", buffer);
             goto cleanup;
         }
     }
@@ -347,6 +333,12 @@ mqtt_message_callback(struct mosquitto *mosq,
             flog(logfile, "unexpected payload for read request\n");
             goto cleanup;
         }
+    }
+
+    if (filter_match(config->head, req) != 0) {
+        error = MQTT_MESSAGE_BLOCKED;
+        flog(logfile, "request blocked {%s}\n", buffer);
+        goto cleanup;
     }
 
     // Change from Register Number to Register Address because libmodbus uses
@@ -440,9 +432,21 @@ done:
 void
 mqtt_connect_callback(struct mosquitto *mosq, void *obj, int result) {
     config_t *config = (config_t *)obj;
-    (void)result;
 
-    mosquitto_subscribe(mosq, NULL, config->request_topic, 0);
+    if (result != MOSQ_ERR_SUCCESS) {
+        flog(logfile,
+             "MQTT connection rejected: %s\n",
+             mosquitto_connack_string(result));
+        automation_emit_mqtt_disconnected(mosquitto_connack_string(result));
+        return;
+    }
+
+    int rc = mosquitto_subscribe(mosq, NULL, config->request_topic, 0);
+    if (rc != MOSQ_ERR_SUCCESS) {
+        flog(logfile, "unable to subscribe: %s\n", mosquitto_strerror(rc));
+        automation_emit_mqtt_disconnected(mosquitto_strerror(rc));
+        return;
+    }
     automation_emit_mqtt_connected();
 }
 

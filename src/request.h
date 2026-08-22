@@ -47,5 +47,7 @@ void *handle_request(void *arg);
 int request_thread_reserve(void);
 void request_thread_release(void);
 int request_wait_for_completion(unsigned int timeout_ms);
+void request_transport_lock(const request_t *request);
+void request_transport_unlock(const request_t *request);
 
 #endif

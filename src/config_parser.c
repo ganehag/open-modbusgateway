@@ -361,15 +361,7 @@ config_parse_file(FILE *file, config_t *config) {
                         config->mqtt_protocol_version = MQTT_PROTOCOL_V5;
                     }
                 } else if (strncmp(name, "tls_version", 11) == 0) {
-                    // For openssl >= 1.0.1, the available options are tlsv1.2,
-                    // tlsv1.1 and tlsv1, with tlv1.2 being the default. For
-                    // openssl < 1.0.1, the available options are tlsv1 and
-                    // sslv3, with tlsv1 being the default.
-
-                    if (strncmp(value, "tlsv1.2", 7) != 0 &&
-                        strncmp(value, "tlsv1.1", 7) != 0 &&
-                        strncmp(value, "tlsv1", 5) != 0) {
-                        // skip sslv3
+                    if (strcmp(value, "tlsv1.2") != 0) {
                         return CONFIG_PARSER_ERROR_INVALID_TLS_VERSION;
                     }
 

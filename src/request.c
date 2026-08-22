@@ -38,6 +38,49 @@ uint16_t request_count = 0;
 pthread_mutex_t request_count_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t request_count_cond = PTHREAD_COND_INITIALIZER;
 
+#define SERIAL_TRANSPORT_LOCKS 32
+
+static pthread_mutex_t serial_transport_locks[SERIAL_TRANSPORT_LOCKS];
+static pthread_once_t serial_transport_locks_once = PTHREAD_ONCE_INIT;
+
+static void
+request_init_serial_transport_locks(void) {
+    for (size_t i = 0; i < SERIAL_TRANSPORT_LOCKS; i++) {
+        pthread_mutex_init(&serial_transport_locks[i], NULL);
+    }
+}
+
+static size_t
+request_serial_transport_lock_index(const request_t *request) {
+    unsigned long hash = 5381;
+    const unsigned char *text = (const unsigned char *)request->serial_device;
+
+    while (*text != '\0') {
+        hash = ((hash << 5) + hash) + *text++;
+    }
+    return hash % SERIAL_TRANSPORT_LOCKS;
+}
+
+void
+request_transport_lock(const request_t *request) {
+    if (request == NULL || request->format != 1) {
+        return;
+    }
+    pthread_once(&serial_transport_locks_once,
+                 request_init_serial_transport_locks);
+    pthread_mutex_lock(
+        &serial_transport_locks[request_serial_transport_lock_index(request)]);
+}
+
+void
+request_transport_unlock(const request_t *request) {
+    if (request == NULL || request->format != 1) {
+        return;
+    }
+    pthread_mutex_unlock(
+        &serial_transport_locks[request_serial_transport_lock_index(request)]);
+}
+
 int
 request_thread_reserve(void) {
     int reserved = 0;
@@ -128,6 +171,7 @@ handle_request(void *arg) {
     modbus_t *ctx = NULL;
     request_t *req = (request_t *)arg;
     int succeeded = 0;
+    int transport_locked = 0;
     char failure_reason[128] = "request failed";
 
     pthread_detach(pthread_self());
@@ -152,6 +196,8 @@ handle_request(void *arg) {
 
     modbus_set_response_timeout(ctx, req->timeout, 0);
     modbus_set_slave(ctx, req->slave_id);
+    request_transport_lock(req);
+    transport_locked = req->format == 1;
     if (modbus_connect(ctx) == -1) {
         snprintf(failure_reason,
                  sizeof(failure_reason),
@@ -222,6 +268,9 @@ modbus_cleanup:
     if (ctx != NULL) {
         modbus_close(ctx);
         modbus_free(ctx);
+    }
+    if (transport_locked) {
+        request_transport_unlock(req);
     }
 
     free(req);

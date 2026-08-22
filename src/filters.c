@@ -78,16 +78,32 @@ filter_free(filter_t **head) {
 static int filter_match_tcp(filter_t *filter, request_t *request);
 static int filter_match_serial(filter_t *filter, request_t *request);
 
+static int
+request_fits_register_range(const filter_t *filter, const request_t *request) {
+    uint32_t end = request->register_addr;
+
+    if (request->function == 1 || request->function == 2 ||
+        request->function == 3 || request->function == 4 ||
+        request->function == 15 || request->function == 16) {
+        if (request->register_count == 0) {
+            return -1;
+        }
+        end += (uint32_t)request->register_count - 1;
+    }
+
+    return request->register_addr >= filter->register_address_min &&
+                   end <= filter->register_address_max
+               ? 0
+               : -1;
+}
+
 int
 filter_match(filter_t *filters, request_t *request) {
     filter_t *current = filters;
 
     if (current == NULL) {
-        // No filters configured; allow request
-        return 0;
+        return -1;
     }
-
-    int has_applicable = 0;
 
     while (current != NULL) {
         if (request->format == 0) {
@@ -95,7 +111,6 @@ filter_match(filter_t *filters, request_t *request) {
                 current = current->next;
                 continue;
             }
-            has_applicable = 1;
             if (filter_match_one(current, request) == 0) {
                 return 0;
             }
@@ -104,7 +119,6 @@ filter_match(filter_t *filters, request_t *request) {
                 current = current->next;
                 continue;
             }
-            has_applicable = 1;
             if (filter_match_serial(current, request) == 0) {
                 return 0;
             }
@@ -114,7 +128,7 @@ filter_match(filter_t *filters, request_t *request) {
         current = current->next;
     }
 
-    return has_applicable ? -1 : 0;
+    return -1;
 }
 
 // function to check if a message matches the content of request_t
@@ -161,8 +175,7 @@ filter_match_tcp(filter_t *filter, request_t *request) {
         return -1;
     }
 
-    if (request->register_addr < filter->register_address_min ||
-        request->register_addr > filter->register_address_max) {
+    if (request_fits_register_range(filter, request) != 0) {
         return -1;
     }
 
@@ -171,8 +184,7 @@ filter_match_tcp(filter_t *filter, request_t *request) {
 
 static int
 filter_match_serial(filter_t *filter, request_t *request) {
-    if (filter->serial_id[0] != '\0' &&
-        strcmp(filter->serial_id, "*") != 0 &&
+    if (filter->serial_id[0] != '\0' && strcmp(filter->serial_id, "*") != 0 &&
         strncmp(filter->serial_id,
                 request->serial_id,
                 sizeof(filter->serial_id)) != 0) {
@@ -187,8 +199,7 @@ filter_match_serial(filter_t *filter, request_t *request) {
         return -1;
     }
 
-    if (request->register_addr < filter->register_address_min ||
-        request->register_addr > filter->register_address_max) {
+    if (request_fits_register_range(filter, request) != 0) {
         return -1;
     }
 
@@ -205,8 +216,7 @@ filter_print(filter_t *filter) {
 
     if (filter->has_ip_range) {
         inet_ntop(AF_INET6, &filter->iprange.ipaddr, ipaddr, sizeof(ipaddr));
-        inet_ntop(
-            AF_INET6, &filter->iprange.netmask, netmask, sizeof(netmask));
+        inet_ntop(AF_INET6, &filter->iprange.netmask, netmask, sizeof(netmask));
     }
 
     printf("Filter: ");

@@ -14,6 +14,7 @@ void test_filter_add(void);
 
 void test_filter_match(void);
 void test_filter_match_without_filters(void);
+void test_filter_match_rejects_range_overrun(void);
 void test_filter_match_serial(void);
 void test_multiple_filters_match(void);
 void test_clear_filters(void);
@@ -29,6 +30,7 @@ void test_config_file_parser_errors(void);
 void test_parse_option_range_errors(void);
 void test_validate_config_without_rules(void);
 void test_validate_config_tls_options(void);
+void test_config_rejects_legacy_tls(void);
 
 void test_trim_functions(void);
 
