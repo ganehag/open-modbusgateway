@@ -10,60 +10,10 @@
 #include "mqtt_test_helpers.h"
 #include "test.h"
 
-extern FILE *logfile;
-
-static void
-silence_logs(void) {
-    set_logfile("/dev/null");
-}
-
-static void
-setup_basic_config(config_t *config, serial_gateway_t *gateway) {
-    memset(config, 0, sizeof(*config));
-    memset(gateway, 0, sizeof(*gateway));
-
-    strncpy(
-        config->response_topic, "response", sizeof(config->response_topic) - 1);
-    config->serial_head = gateway;
-    config->head = NULL;
-
-    strncpy(gateway->id, "ttyusb0", sizeof(gateway->id) - 1);
-    strncpy(gateway->device, "/dev/ttyUSB0", sizeof(gateway->device) - 1);
-    gateway->baudrate = 9600;
-    gateway->parity = 'N';
-    gateway->data_bits = 8;
-    gateway->stop_bits = 1;
-    gateway->next = NULL;
-}
-
-static void
-add_serial_filter(config_t *config,
-                  const char *serial_id,
-                  uint8_t slave_id,
-                  uint8_t function,
-                  uint16_t reg_min,
-                  uint16_t reg_max) {
-    filter_t *filter = calloc(1, sizeof(filter_t));
-    filter->applies_serial = 1;
-    if (serial_id != NULL) {
-        strncpy(filter->serial_id, serial_id, sizeof(filter->serial_id) - 1);
-    }
-    filter->slave_id = slave_id;
-    filter->function_code = function;
-    filter->register_address_min = reg_min;
-    filter->register_address_max = reg_max;
-    filter_add(&config->head, filter);
-}
-
-static struct mosquitto_message
-make_message(const char *payload) {
-    struct mosquitto_message msg;
-    memset(&msg, 0, sizeof(msg));
-    msg.payload = (void *)payload;
-    msg.payloadlen = (int)strlen(payload);
-    msg.topic = "request";
-    return msg;
-}
+#define silence_logs mqtt_test_silence_logs
+#define setup_basic_config mqtt_test_setup_serial_config
+#define add_serial_filter mqtt_test_add_serial_filter
+#define make_message mqtt_test_make_message
 
 void
 test_mqtt_format1_slave_override(void) {

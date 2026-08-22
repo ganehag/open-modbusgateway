@@ -789,10 +789,15 @@ uninstall-am:
 .PRECIOUS: Makefile
 
 
-.PHONY: integration-check
+.PHONY: integration-check coverage
 
 integration-check: all
 	$(top_srcdir)/test/run_serial_gateway_integration.sh
+
+coverage:
+	$(MAKE) clean
+	$(MAKE) check CFLAGS='$(CFLAGS) -O0 --coverage'
+	gcovr --root $(top_srcdir) --exclude 'test/' --txt coverage.txt
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
