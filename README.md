@@ -1,324 +1,221 @@
-<p align="center">
-    <img src="https://raw.githubusercontent.com/ganehag/open-modbusgateway/master/docs/images/timmy.svg" alt="Open Modbus Gateway" width="300" />
-    <br>
-    <br>
-    <quote>&ldquo;Open Modbus Gateway, a bridge between two worlds, connecting the security efficiency of MQTT with the simplicity of Modbus, the gateway/bridge allows for seamless communication and data flow between devices, opening up new possibilities for automation and optimization.&rdquo;</quote>
-</p>
-
----
-
-
 # Open MQTT to Modbus Gateway
 
-This software is an Open Source alternative to Teltonikas' Modbus Gateway (`modbusgateway`).
+`openmmg` accepts Modbus requests on MQTT and forwards them to Modbus TCP or
+RTU devices. It is a small C daemon built on [libmosquitto](https://mosquitto.org/)
+and [libmodbus](https://libmodbus.org/).
 
-It is written in C and uses the [libmodbus](https://libmodbus.org/) library. It also depends on the [libmosquitto](https://mosquitto.org/) library for MQTT communication.
+It started as a replacement for Teltonika's `modbusgateway`, but it is now its
+own project and is not protocol-compatible with that program.
 
-This software used to be a drop-in replacement for the Teltonika Modbus Gateway software, but it has since been rewritten and is no longer compatible.
+The gateway is deliberately conservative: a request must match an explicit
+rule before it reaches a device. MQTT authentication is useful, but it is not a
+substitute for limiting what may be read or written.
 
-> **NOTE:** This software is not affiliated with Teltonika, and I've not seen a single line of Teltonika code.
+## Build and run
 
+Install the usual build tools plus development packages for CUnit, libmodbus,
+libmosquitto, and Lua 5.1–5.4. Then:
 
-## Background
+```sh
+autoreconf -fi
+./configure --prefix=/usr
+make
+make check
+```
 
-The Teltonika RUT's `modbusgateway` software is a crucial component of the product offering at my company.
+Run the daemon with an explicit configuration file while setting it up:
 
-I don't know why Teltonika developed it in the first place, the requirements, or the design decisions behind it. All I know is that it doesn't (at the time of writing) support all typical Modbus functions. I raised this problem with them in February 2021, but it is still unresolved.
+```sh
+src/openmmg -c /etc/openmmg/openmmg.conf
+```
 
-Instead of waiting for a fix, I created my own software to fill the gap.
+`src/openmmg.conf.example` is a starting point. Without `-c`, the daemon also
+looks for `/etc/openmmg/openmmg.conf`, `/etc/openmmg/settings.conf`, and
+`./openmmg.conf`.
 
+Useful development checks:
 
-## Benefits over the original software
+```sh
+make check
+make integration-check
+make coverage       # requires gcovr
+```
 
-At first, it was nothing more than a drop-in replacement for the original software, with support for the missing Modbus functions. However, with time I realised that some security layer was required to prevent unwanted commands to Modbus slaves. Along with that came the need for a rules engine to filter out unwanted requests. While I was at it, I also added support for TLS so that the software no longer needs to rely on a separate MQTT broker.
+The integration test creates virtual serial ports, starts a local Mosquitto
+broker, and exercises RTU filtering, concurrent requests, and Lua automation.
 
-* Supports all Modbus functions
-* Is open source
-* Supports TLS without the need for a separate MQTT broker
-* Rules engine for advanced filtering of requests
+## MQTT request format
 
+Publish requests to the configured request topic. Replies are published on the
+configured response topic. Fields are whitespace-separated; register values for
+functions 15 and 16 are comma-separated and contain no spaces.
 
-## Protocol
+### Modbus TCP
 
-A `controller` publishes a message in the format below on a `request` topic. The software interprets the message and performs a Modbus request based on instructions from the message. The software then replies on the `response` topic.
+```text
+0 COOKIE IP_TYPE IP PORT TIMEOUT SLAVE_ID FUNCTION ADDRESS COUNT_OR_VALUE [VALUES]
+```
 
-### Request message
+`IP_TYPE` is `0` for IPv4, `1` for IPv6, and `2` for a hostname. `ADDRESS` is
+one-based, as it is in most Modbus documentation; the gateway converts it for
+libmodbus.
 
-`0 <COOKIE> <IP_TYPE> <IP> <PORT> <TIMEOUT> <SLAVE_ID> <MODBUS_FUNCTION> <REGISTER_NUMBER> <REGISTER_COUNT/VALUE> <DATA>`
+Example: read two holding registers from unit 1 at 192.0.2.10:502:
 
-| Field                | Value                                      | Explanation                                                                                                                                                                                                                                                                                                                                                           |
-|----------------------|--------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 0                    | 0                                          | Must be 0, which signifies a textual format (currently the only one implemented).                                                                                                                                                                                                                                                                                     |
-| COOKIE               | 64-bit unsigned integer in range [0..2^64] | A cookie is used to distinguish which response belongs to which request. Each request and the corresponding response contain a matching cookie: a 64-bit unsigned integer.                                                                                                                                                                                            |
-| IP_TYPE              | 0, 1, 2                                    | Host IP address type. Possible values: 0 (IPv4 address), 1 (IPv6 address), 2 (hostname pointing to an IP address).                                                                                                                                                                                                                                                    |
-| IP                   | IP address                                 | IP address of a Modbus TCP slave. IPv6 must be presented in full form (e.g., 2001:0db8:0000:0000:0000:8a2e:0370:7334).                                                                                                                                                                                                                                                |
-| PORT                 | port number                                | Port number of the Modbus TCP slave.                                                                                                                                                                                                                                                                                                                                  |
-| TIMEOUT              | timeout in seconds                         | Timeout for Modbus TCP connection, in seconds. Range [1..999].                                                                                                                                                                                                                                                                                                        |
-| SLAVE_ID             | Modbus TCP slave ID                        | Modbus TCP slave ID. Range [1..255].                                                                                                                                                                                                                                                                                                                                  |
-| MODBUS_FUNCTION      | 1, 2, 3, 4, 5, 6, 15, 16                   | Modbus function. Possible values: 1 (read coils), 2 (read discret inputs), 3 (read holding registers), 4 (read input registers), 5 (force/write single coil), 6 (preset/write a single holding register), 15 (force/write multiple coils), 16 (preset/write to multiple holding registers)                                                                            |
-| REGISTER_NUMBER      | register number                            | Number of the first register (in the range [1..65536]) from which the registers will be read/written.                                                                                                                                                                                                                                                                 |
-| REGISTER_COUNT/VALUE | coil/register count or value               | This value depends on the Modbus function: 1, 2, 3, 4 (coil/register count in range [1..125]), 5 (coil value in range [0..1]), 6 (register value in range [0..65535]), 15 (register count in range [1..123]), 16 (register count in range [1..123]). Must not exceed the boundary (first register number + register count <= 65537)                                   |
-| DATA                 | series of coil/register values             | This field only exists for Modbus functions 15 (coil) and 16 (register). A series of coil/register values separated with commas, without spaces (e.g., 0,1,1,0,0,1 or 1,2,3,654,21,789). There must be exactly as many values as specified in register count. Each coil value must be in the range of [0..1]. Each register value must be in the range of [0..65535]. |
+```text
+0 1001 0 192.0.2.10 502 5 1 3 1 2
+```
 
-`1 <COOKIE> <SERIAL_DEVICE_ID> <TIMEOUT> <SLAVE_ID> <MODBUS_FUNCTION> <REGISTER_NUMBER> <REGISTER_COUNT/VALUE>`
+### Modbus RTU
 
-- `SERIAL_DEVICE_ID` maps to a `config serial_gateway` stanza in `openmmg.conf`. The gateway uses that entry to resolve `/dev/tty*`, baudrate, parity, data bits, stop bits, and an optional fixed `slave_id`.
-- Remaining fields mirror the TCP format; register payloads (for functions 15/16) are provided as a trailing comma-separated list just like format `0`.
-- If the referenced serial gateway sets `option slave_id`, the request inherits that value and cannot override it.
+```text
+1 COOKIE SERIAL_ID TIMEOUT SLAVE_ID FUNCTION ADDRESS COUNT_OR_VALUE [VALUES]
+```
 
+`SERIAL_ID` names a `config serial_gateway` entry. Its device and line settings
+come from the configuration, never from the MQTT message. A fixed `slave_id`
+in that entry replaces the one in the message.
 
-### Response message
+```text
+1 1002 boiler 5 1 3 1 2
+```
 
-`<COOKIE> OK`
+Supported functions are 1, 2, 3, 4, 5, 6, 15, and 16. Read requests allow up
+to 125 values; functions 15 and 16 allow up to 123. The parser rejects extra
+fields, malformed numbers, and out-of-range values.
 
-`<COOKIE> OK <VALUE> <VALUE> <VALUE>`
+### Replies
 
-`<COOKIE> ERROR <ERROR_CODE>`
+```text
+COOKIE OK
+COOKIE OK VALUE [VALUE ...]
+COOKIE ERROR: MESSAGE
+```
 
-| Field    | Value                   | Explanation                                                                                                                                                                |
-|----------|-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| COOKIE   | 64-bit unsigned integer | A cookie is used to distinguish which response belongs to which request. Each request and the corresponding response contain a matching cookie: a 64-bit unsigned integer. |
-| Function | 5, 6, 15, 16            | For functions 5, 6, 15 and 16, the response will be "&lt;COOKIE&gt; OK"                                                                                                    |
-| Function | 1, 2, 3, 4              | For functions 1, 2, 3, 4, the response will be "&lt;COOKIE&gt; OK &lt;VALUE&gt; &lt;VALUE&gt; &lt;VALUE&gt; ..." where &lt;VALUE&gt; are the values                        |
-| Error    |                         | For failures, the response will be "&lt;COOKIE&gt; ERROR: &lt;message&gt;" where &lt;message&gt; is the error description.                                                 |
+Write requests return `OK`. Read requests return one value per requested coil
+or register. Rejected requests get an error reply using the same cookie whenever
+the cookie could be parsed.
 
+## Access rules and security
 
-## Examples
+No rule means no access. TCP and serial rules are separate: a serial rule does
+not permit TCP traffic, and vice versa.
 
+A rule covers a target, slave ID, function, and register range. For reads and
+multi-value writes, the whole requested span must fit inside the range. A rule
+for registers `1-10` does not permit a ten-register request starting at 10.
 
-| Action                                  | Request                                               | Response                            |
-|-----------------------------------------|-------------------------------------------------------|-------------------------------------|
-| Reading five coils                      | 0 16468394968118163995 0 10.0.0.126 5020 5 1 1 1 5    | 16468394968118163995 OK 1 1 1 1 1   |
-| Reading three input registers           | 0 9958479625634 0 10.0.0.126 5020 5 1 4 1 3           | 9958479625634 OK 1234 5678 9101     |
-| Sending too few holding register values | 0 565842596387 0 10.0.0.126 5020 5 1 16 1 3 1234,5678 | 565842596387 ERROR: INVALID REQUEST |
+Use TLS for the MQTT connection in production. The gateway accepts `tlsv1.2`
+when TLS is configured and verifies the broker certificate by default. Keep
+broker ACLs tight too: clients that do not need to issue Modbus requests should
+not be allowed to publish to the request topic.
 
+RTU traffic to the same serial device is serialized. Different devices may run
+in parallel. `max_inflight_requests` limits all active Modbus transactions; a
+new request receives a capacity error when the limit is reached.
 
-## Security
-
-Modbus is a protocol that is not secure by default. There is no authentication or encryption in the Modbus protocol.
-
-This software uses MQTT to relay messages to a Modbus TCP slave from the internet. MQTT is capable of being a secure protocol, but only if the MQTT broker and client both support TLS encryption.
-
-TLS encryption is supported and tested against the [test.mosquitto.org](https://test.mosquitto.org/) broker on port 8884.
-
-Still, even with encryption, one shouldn't just trust any message sent to the gateway. Otherwise, the gateway would blindly relay the message to the Modbus TCP slave. Even a simple misspelling of a register number could cause damage to the Modbus TCP slave.
-
-To get around this, the gateway has built-in checks to filter out messages. A message must pass the following checks to be relayed to the Modbus TCP slave:
-
-- CIDR check: the IP address of the request target must be within the specified CIDR range.
-- Port check: the port number of the request target must be within the specified range.
-- Register-range check: the complete requested span, not only its starting register, must fit an allowed rule.
-
-The gateway is deny-by-default: every TCP or serial request needs a matching
-`config rule`. Rules for one transport do not authorize the other transport.
-Serial RTU transactions targeting the same device are serialized so that frames
-cannot collide on a shared bus.
-- Slave ID check: the slave ID of the request must match the specified slave ID.
-- Function check: the Modbus function of the request must match and be only one of the following: 1, 2, 3, 4, 5, 6, 15 or 16.
-- Register number check: the register number must be within the specified range.
-
-The checks are configurable via the configuration file. The configuration file is described in the next section.
-
+Treat the configuration file as sensitive when it contains MQTT passwords or
+client keys. Do not put live credentials in the example configuration.
 
 ## Configuration
 
-The config file is used to specify the settings for the application. The file must be in plain text format.
-
-### Format
-
-The file is divided into sections, each section starts with a `config` keyword followed by the name of the section.
-Each section contains multiple options, each option is specified on a new line and starts with the `option` keyword followed by the name of the option and its value.
-
-Section and option names are exact. Unknown names, malformed numeric values,
-and invalid boolean values cause configuration loading to fail rather than being
-silently ignored.
+The format is intentionally small:
 
 ```text
-config <section_name>
-	option <option_name> '<option_value>'
-	option <option_name> '<option_value>'
-	...
+config section_name
+    option name 'value'
 ```
 
-Example config file:
+Section and option names are exact. Unknown options, bad booleans, and malformed
+numeric values make configuration loading fail rather than being ignored.
+
+Here is a minimal RTU configuration:
 
 ```text
 config mqtt
-	option host '127.0.0.1'
-	option port '1883'
-	option keepalive '60'
-	option username 'user'
-	option password 'pass'
-	option qos '0'
-	option retain 'false'
-	option clean_session 'true'
-	option request_topic 'request'
-	option response_topic 'response'
-	option ca_cert_path 'cert/ca.crt'
-	option cert_path 'cert/client.crt'
-	option key_path 'cert/client.key'
+    option host '127.0.0.1'
+    option port '1883'
+    option request_topic 'request'
+    option response_topic 'response'
+    option max_inflight_requests '20'
+
+config serial_gateway
+    option id 'boiler'
+    option device '/dev/ttyUSB0'
+    option baudrate '9600'
+    option parity 'even'
+    option data_bits '8'
+    option stop_bits '1'
+    option slave_id '1'
 
 config rule
-	option ip '::ffff:127.0.0.1/128'
-	option port '1502'
-	option slave_id '1'
-	option function '3'
-	option register_address '0-65535'
+    option serial_id 'boiler'
+    option slave_id '1'
+    option function '3'
+    option register_address '1-100'
 ```
 
-### Sections
+`config mqtt` supports `host`, `port`, `keepalive`, `max_inflight_requests`,
+`username`, `password`, `client_id`, `qos`, `retain`, `mqtt_protocol`,
+`tls_version`, `clean_session`, certificate paths, `verify_ca_cert`,
+`request_topic`, and `response_topic`.
 
-- `mqtt`: This section contains the settings for the MQTT connection. It has the following options:
-  - `host`: The hostname or IP address of the MQTT broker.
-  - `port`: The port number of the MQTT broker.
-  - `keepalive`: The keepalive interval in seconds.
-  - `max_inflight_requests`: Maximum concurrent Modbus transactions. Excess MQTT requests receive an immediate capacity error; the default is `20`.
-  - `username`: The username for the MQTT broker.
-  - `password`: The password for the MQTT broker.
-  - `client_id`: The client ID for the MQTT connection.
-  - `qos`: The quality of service for the MQTT connection. Must be either 0, 1 or 2.
-  - `retain`: Whether to retain the MQTT messages. Must be either true or false.
-  - `mqtt_protocol`: The MQTT protocol version to use. Must be either 3.1, 3.1.1, or 5.
-  - `tls_version`: The TLS version to use. Use `tlsv1.2` or newer where supported.
-  - `clean_session`: Whether to use a clean session for the MQTT connection. Must be either true or false.
-  - `ca_cert_path`: The path to the CA certificate file. Set this to enable TLS with server certificate verification; it is required when using a client certificate.
-  - `cert_path`: Optional path to the client certificate file. It must be set together with `key_path`.
-  - `key_path`: Optional path to the client key file. It must be set together with `cert_path`.
-  - `verify`: Whether to verify the server certificate. Should not be used in production.
-  - `request_topic`: The topic used for receiving requests.
-  - `response_topic`: The topic used to send responses.
+`config serial_gateway` requires `id` and `device`; it also accepts `baudrate`,
+`parity` (`none`, `even`, or `odd`), `data_bits`, `stop_bits`, and an optional
+fixed `slave_id`.
 
-- `mqtt`: This section contains the settings for the MQTT connection. It has the following options:
-  - `host`: The hostname or IP address of the MQTT broker.
-  - `port`: The port number of the MQTT broker.
-  - `keepalive`: The keepalive interval in seconds.
-  - `username`: The username for the MQTT broker.
-  - `password`: The password for the MQTT broker.
-  - `qos`: The quality of service for the MQTT connection. Must be either 0, 1 or 2.
-  - `retain`: Whether to retain the MQTT messages. Must be either `true` or `false`.
-  - `clean_session`: Whether to use a clean session for the MQTT connection. Must be either `true` or `false`.
-  - `request_topic`: The topic used for receiving requests.
-  - `response_topic`: The topic used to send responses.
-  - `ca_cert_path`: The path to the CA certificate file. Set this to enable TLS with server certificate verification; it is required when using a client certificate.
-  - `cert_path`: Optional path to the client certificate file. It must be set together with `key_path`.
-  - `key_path`: Optional path to the client key file. It must be set together with `cert_path`.
+Each `config rule` has `slave_id`, `function`, and `register_address`, plus
+either TCP target fields (`ip` and optional `port`) or a `serial_id`. Register
+and port options accept a number, a range such as `10-20`, or a comma-separated
+list of ranges.
 
-- `rule`: This section contains the settings for the Modbus communication filtering. It can appear multiple times in the config file. Each section has the following options:
-  - `ip`: The IP address of the Modbus device, it must be an IPv6 address or an IPv4 address encoded in IPv6 format, and it must also include a subnet mask.
-  - `port`: The port number of the Modbus device. It can be a single number or a range of numbers separated by a '-'.
-  - `slave_id`: The slave ID of the Modbus device.
-  - `function`: The function code used for the Modbus communication.
-  - `serial_id`: Optional; when provided, the rule applies to Modbus RTU requests that reference the named `config serial_gateway` stanza. Use `*` to match any serial gateway.
-  - `register_address`: The range of register addresses used for the Modbus communication, it should be in the form of 'start-end'.
-- `serial_gateway`: Defines serial Modbus RTU endpoints that MQTT requests can reference. Each entry must provide:
-  - `id`: Identifier used in MQTT payloads (`SERIAL_DEVICE_ID`).
-  - `device`: Serial device path (e.g., `/dev/ttyUSB0`).
-  - `baudrate`: Baud rate for the serial link.
-  - `parity`: `none`, `even`, or `odd`.
-  - `data_bits`: Typically `8`; must be between 5 and 8.
-  - `stop_bits`: `1` or `2`.
-  - `slave_id`: Optional fixed slave ID; when set, requests inherit this value.
-  - Optional `ip`/`port` fields can document the TCP side of a gateway deployment.
-  - At least one matching `config rule` is required for every request. A serial-only rule does not permit TCP requests, and a TCP-only rule does not permit serial requests.
+## Lua automation
 
-### Integration Test Harness
-
-An end-to-end check that spins up virtual serial ports, a synthetic Modbus RTU slave, and a local Mosquitto broker is available:
-
-```bash
-./test/run_serial_gateway_integration.sh
-```
-
-It requires `socat`, `gcc`, `libmodbus`, and permission to run `mosquitto` on TCP port `18884`. The script will build `src/openmmg` on demand and then verify that a format `1` MQTT request receives the expected Modbus response via the configured `config serial_gateway` stanza.
-
-### Lua automation
-
-An optional `config automation` stanza loads one Lua script when the gateway
-starts:
+An optional Lua script can observe the gateway and adjust requests. Lua 5.1
+through 5.4 are supported.
 
 ```text
 config automation
-	option script '/etc/openmmg/automation.lua'
+    option script '/etc/openmmg/automation.lua'
 ```
 
-Lua 5.1 through 5.4 are supported. Define only the callbacks your deployment
-uses. Passive lifecycle hooks are `on_gateway_started`, `on_gateway_stopping`,
+Lifecycle callbacks include `on_gateway_started`, `on_gateway_stopping`,
 `on_mqtt_connected`, `on_mqtt_disconnected`, `on_request_accepted`,
 `on_request_rejected`, `on_modbus_succeeded`, `on_modbus_failed`, and
-`on_timer` (at most once per second).
+`on_timer`.
 
-Request hooks form a synchronous pipeline:
+Request callbacks run in this order:
 
 ```text
 on_before_request
 on_before_read | on_before_write
-on_before_read_coils | on_before_read_discrete_inputs |
-on_before_read_registers | on_before_read_input_registers |
-on_before_write_coil | on_before_write_register |
-on_before_write_coils | on_before_write_registers
+on_before_<function>
 Modbus operation
 on_after_request
 on_after_read | on_after_write
-on_after_read_coils | on_after_read_discrete_inputs |
-on_after_read_registers | on_after_read_input_registers |
-on_after_write_coil | on_after_write_register |
-on_after_write_coils | on_after_write_registers
+on_after_<function>
 ```
 
-Before hooks receive a request table. Its operation is in `function_code`.
-They may change its `address`, `count`,
-and (for reads and multi-value writes) `values`, or return `false, "reason"`
-to reject it. Endpoint, unit ID, function, and cookie remain gateway-controlled.
-The changed request is checked again against the configured filters. After hooks
-receive the completed request; for reads, edits to `response.values` are
-reflected in the MQTT response.
+Before callbacks may change the address, count, or values in the request table,
+or return `false, "reason"` to reject it. The gateway validates and filters the
+changed request again. Endpoint, unit ID, function, and cookie remain under
+gateway control.
 
-Before hooks can also call `gateway.read_registers(address, count)` and
-`gateway.write_registers(address, values)` for auxiliary work on the same
-target. Successful Modbus events include an opaque `target` descriptor that can
-be passed to `gateway.write_registers_to(target, address, values)` from a timer
-or lifecycle callback. These calls are subject to the same Modbus timeout and
-filters, and return `nil, error` on failure. Scripts also have `gateway.log(message)`. The
-`io`, `os`, `package`, and `debug` libraries are not loaded, dynamic script
-loading is disabled, and each callback has a fixed instruction budget and a
-1 MiB Lua memory limit. See
-`examples/automation.lua.example` for a complete starting point.
+Scripts may use `gateway.read_registers(address, count)`,
+`gateway.write_registers(address, values)`, and
+`gateway.write_registers_to(target, address, values)` for permitted auxiliary
+work. See `examples/automation.lua.example` for an inactivity-reset example.
 
-## Building the package with OpenWRT
+The Lua environment does not expose `io`, `os`, `package`, or `debug`; dynamic
+script loading is disabled. Callbacks have an instruction budget and the Lua
+state has a 1 MiB memory limit.
 
-For detailed instructions on building a single package for OpenWRT, refer to the [OpenWRT documentation](https://openwrt.org/docs/guide-developer/toolchain/single.package).
+## OpenWrt
 
-### Quick Start Guide
+The `openwrt/` directory contains the package recipe. Copy it into an OpenWrt
+source tree under `package/utils/open-modbusgateway`, select the package in
+`make menuconfig`, and build it with:
 
-1. **Download and Extract OpenWRT**  
-   Start by downloading and extracting the OpenWRT [source code](https://github.com/openwrt/openwrt/releases).
-
-2. **Update and Install Feeds**  
-   ```
-   ./scripts/feeds update -a
-   ./scripts/feeds install -a
-   ```
-
-3. **Integrate open-modbusgateway**  
-   Copy the contents from the `openwrt` subfolder in the open-modbusgateway repository into the `package/utils/open-modbusgateway` directory.
-   ```
-   cp -a openwrt /path/to/openwrt-source/package/utils/open-modbusgateway
-   ```
-
-4. **Configure the Build System**  
-   Run `make menuconfig`, navigate to `Network`, and select the open-modbusgateway package with `[M]`.
-
-5. **Customize Build Options**  
-   Adjust any other settings, such as ARCH and toolchain options.
-
-6. **Build Tools and Toolchain**  
-   ```
-   make tools/install
-   make toolchain/install
-   ```
-
-7. **Compile the Package**  
-   ```
-   make package/open-modbusgateway/compile V=s
-   ```
-   The output will be located in a subfolder of the `bin/` directory, such as; `bin/packages/i386_pentium4/base/`.
+```sh
+make package/open-modbusgateway/compile V=s
+```
