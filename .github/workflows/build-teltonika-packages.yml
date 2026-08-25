@@ -65,7 +65,13 @@ jobs:
           sed -i "s|^PKG_SOURCE_VERSION:=.*|PKG_SOURCE_VERSION:=${GITHUB_SHA}|" "$package_makefile"
           rm -f "$SDK_DIR/dl/open-modbusgateway-0.4.0.tar.xz"
           rm -rf "$SDK_DIR/build_dir"/*/open-modbusgateway-0.4.0
-          make -C "$SDK_DIR" package/open-modbusgateway/compile V=s
+          # Teltonika's package rules omit recursive dependency builds in
+          # QUILT mode. The package-builder image supplies that complete,
+          # target-specific dependency closure already. Its fakeroot daemon
+          # deadlocks in an OCI container, so write equivalent root ownership
+          # directly into the IPK tar streams.
+          make -C "$SDK_DIR" package/open-modbusgateway/compile V=s \
+            QUILT=1 FAKEROOT= TAR='tar --owner=0 --group=0 --numeric-owner'
           mkdir -p "$GITHUB_WORKSPACE/dist"
           find "$SDK_DIR/bin/packages" -type f -name 'open-modbusgateway_*.ipk' -exec cp {} "$GITHUB_WORKSPACE/dist/" \;
           test "$(find "$GITHUB_WORKSPACE/dist" -type f -name '*.ipk' | wc -l)" -eq 1

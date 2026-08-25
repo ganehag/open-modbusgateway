@@ -133,12 +133,13 @@ RUN cd "$TELTONIKA_SDK_DIR" \
 FROM gateway-dependencies AS package-builder-sdk
 
 RUN cd "$TELTONIKA_SDK_DIR" \
-    && rm -rf dl logs build_dir \
+    && rm -rf logs \
     && rm -rf staging_dir/host/opt staging_dir/toolchain-*/initial \
     && tar -C "$TELTONIKA_SDK_DIR" -cf /tmp/package-builder-sdk.tar \
         .config Config.in Makefile rules.mk version ipk_packages.json \
         feeds.conf.default feeds.lock \
-        include package target toolchain tools scripts feeds staging_dir tmp
+        bin include package target toolchain tools scripts feeds staging_dir tmp \
+        build_dir/target-*
 
 FROM sdk-base AS package-builder
 
