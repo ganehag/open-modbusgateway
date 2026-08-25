@@ -44,7 +44,7 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.select-targets.outputs.targets) }}
     container:
-      image: ghcr.io/${{ github.repository }}/teltonika-sdk-${{ matrix.target }}-packager:latest
+      image: ghcr.io/${{ github.repository }}/teltonika-sdk-${{ matrix.target }}-package-builder:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}

@@ -21,7 +21,7 @@ on:
         options:
           - both
           - compiler
-          - packager
+          - package-builder
 
 permissions:
   contents: read
@@ -78,15 +78,15 @@ jobs:
           docker push "${IMAGE%:latest}:$SDK_VERSION"
 
       - name: Build package-builder image
-        if: (inputs.profile == 'both' || inputs.profile == 'packager') && (inputs.target == 'all' || inputs.target == matrix.target)
+        if: (inputs.profile == 'both' || inputs.profile == 'package-builder') && (inputs.target == 'all' || inputs.target == matrix.target)
         env:
-          IMAGE: ghcr.io/${{ github.repository }}/teltonika-sdk-${{ matrix.target }}-packager:latest
-        run: ./scripts/build-teltonika-sdk-image "${{ matrix.target }}" packager "$IMAGE"
+          IMAGE: ghcr.io/${{ github.repository }}/teltonika-sdk-${{ matrix.target }}-package-builder:latest
+        run: ./scripts/build-teltonika-sdk-image "${{ matrix.target }}" package-builder "$IMAGE"
 
       - name: Push package-builder image
-        if: (inputs.profile == 'both' || inputs.profile == 'packager') && (inputs.target == 'all' || inputs.target == matrix.target)
+        if: (inputs.profile == 'both' || inputs.profile == 'package-builder') && (inputs.target == 'all' || inputs.target == matrix.target)
         env:
-          IMAGE: ghcr.io/${{ github.repository }}/teltonika-sdk-${{ matrix.target }}-packager:latest
+          IMAGE: ghcr.io/${{ github.repository }}/teltonika-sdk-${{ matrix.target }}-package-builder:latest
         run: |
           . teltonika/targets.sh
           teltonika_target "${{ matrix.target }}"
@@ -98,7 +98,7 @@ jobs:
         if: inputs.target == 'all' || inputs.target == matrix.target
         env:
           COMPILER_IMAGE: ghcr.io/${{ github.repository }}/teltonika-sdk-${{ matrix.target }}:latest
-          PACKAGER_IMAGE: ghcr.io/${{ github.repository }}/teltonika-sdk-${{ matrix.target }}-packager:latest
+          PACKAGE_BUILDER_IMAGE: ghcr.io/${{ github.repository }}/teltonika-sdk-${{ matrix.target }}-package-builder:latest
         run: |
-          if [ "${{ inputs.profile }}" != packager ]; then docker inspect --format='{{index .RepoDigests 0}}' "$COMPILER_IMAGE"; fi
-          if [ "${{ inputs.profile }}" != compiler ]; then docker inspect --format='{{index .RepoDigests 0}}' "$PACKAGER_IMAGE"; fi
+          if [ "${{ inputs.profile }}" != package-builder ]; then docker inspect --format='{{index .RepoDigests 0}}' "$COMPILER_IMAGE"; fi
+          if [ "${{ inputs.profile }}" != compiler ]; then docker inspect --format='{{index .RepoDigests 0}}' "$PACKAGE_BUILDER_IMAGE"; fi

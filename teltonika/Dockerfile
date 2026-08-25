@@ -119,13 +119,39 @@ LABEL org.opencontainers.image.title="Open Modbus Gateway Teltonika SDK" \
 WORKDIR /workspace
 CMD ["/bin/bash"]
 
-FROM bootstrap AS packager
+FROM bootstrap AS gateway-dependencies
+
+# Build Open Modbus Gateway once to populate the target staging area with its
+# dependency packages. The source and all disposable object files are removed
+# below; only the compiler and installed target headers/libraries survive.
+RUN cd "$TELTONIKA_SDK_DIR" \
+    && make package/open-modbusgateway/compile -j"$(nproc)"
+
+FROM gateway-dependencies AS package-builder-sdk
+
+RUN cd "$TELTONIKA_SDK_DIR" \
+    && rm -rf dl logs build_dir \
+    && rm -rf staging_dir/host/opt staging_dir/toolchain-*/initial \
+    && tar -C "$TELTONIKA_SDK_DIR" -cf /tmp/package-builder-sdk.tar \
+        .config Config.in Makefile rules.mk version ipk_packages.json \
+        feeds.conf.default feeds.lock \
+        include package target toolchain tools scripts feeds staging_dir tmp
+
+FROM sdk-base AS package-builder
 
 ARG SDK_VERSION
 ARG SDK_TARGET
 
-LABEL org.opencontainers.image.title="Open Modbus Gateway Teltonika SDK packager" \
-      org.opencontainers.image.description="Prepared Teltonika SDK with package-build state; private build infrastructure" \
+RUN --mount=type=bind,from=package-builder-sdk,source=/tmp/package-builder-sdk.tar,target=/tmp/package-builder-sdk.tar,readonly \
+    set -eux; \
+    mkdir -p "$TELTONIKA_SDK_DIR"; \
+    tar -xf /tmp/package-builder-sdk.tar -C "$TELTONIKA_SDK_DIR"; \
+    chown -R builder:builder "$TELTONIKA_SDK_DIR"
+
+USER builder
+
+LABEL org.opencontainers.image.title="Open Modbus Gateway Teltonika package builder" \
+      org.opencontainers.image.description="Prepared Teltonika SDK with staged Open Modbus Gateway dependencies; private build infrastructure" \
       org.opencontainers.image.source="https://github.com/ganehag/open-modbusgateway" \
       org.opencontainers.image.vendor="ganehag" \
       org.opencontainers.image.version="${SDK_VERSION}" \

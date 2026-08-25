@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [ "$#" -ne 3 ]; then
-    echo "usage: $0 <rut9-r|rut9m-r|trb1-r> <compiler|packager> <image-reference>" >&2
+    echo "usage: $0 <rut9-r|rut9m-r|trb1-r> <compiler|package-builder> <image-reference>" >&2
     exit 2
 fi
 
@@ -16,10 +16,10 @@ repository_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 teltonika_target "$target"
 
 case "$profile" in
-compiler|packager) ;;
+compiler|package-builder) ;;
 *)
     echo "unknown image profile: $profile" >&2
-    echo "supported profiles: compiler, packager" >&2
+    echo "supported profiles: compiler, package-builder" >&2
     exit 2
     ;;
 esac
