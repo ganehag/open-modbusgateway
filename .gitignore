@@ -24,3 +24,6 @@ node_modules
 /test-driver
 /modbusgateway-*.tar.*
 /coverage.txt
+
+# Downloaded Teltonika SDK archives are build inputs, not source files.
+/teltonika/downloads/

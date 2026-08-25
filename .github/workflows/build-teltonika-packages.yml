@@ -1,0 +1,80 @@
+name: Build Teltonika packages
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Teltonika package target to build
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - rut9-r
+          - rut9m-r
+          - trb1-r
+
+permissions:
+  contents: write
+  packages: read
+
+jobs:
+  build:
+    if: github.event_name == 'release' || inputs.target == 'all' || inputs.target == matrix.target
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: rut9-r
+            sdk_version: 00.07.06.21
+          - target: rut9m-r
+            sdk_version: 00.07.24
+          - target: trb1-r
+            sdk_version: 00.07.24.2
+    container:
+      image: ghcr.io/${{ github.repository }}/teltonika-sdk-${{ matrix.target }}-packager:${{ matrix.sdk_version }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@v4
+
+      - name: Build OpenWrt package
+        env:
+          SDK_DIR: /opt/teltonika-sdk
+        run: |
+          set -eu
+          make -C "$SDK_DIR" package/libs/toolchain/compile
+          make -C "$SDK_DIR" package/open-modbusgateway/compile V=s
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+          find "$SDK_DIR/bin/packages" -type f -name 'open-modbusgateway_*.ipk' -exec cp {} "$GITHUB_WORKSPACE/dist/" \;
+          test "$(find "$GITHUB_WORKSPACE/dist" -type f -name '*.ipk' | wc -l)" -eq 1
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: open-modbusgateway-${{ matrix.target }}
+          path: dist/*.ipk
+          if-no-files-found: error
+
+  publish:
+    if: github.event_name == 'release' && success()
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download package artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: open-modbusgateway-*
+          merge-multiple: true
+
+      - name: Attach packages to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" dist/*.ipk --clobber

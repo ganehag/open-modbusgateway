@@ -44,6 +44,60 @@ pthread_cond_t request_count_cond = PTHREAD_COND_INITIALIZER;
 static pthread_mutex_t serial_transport_locks[SERIAL_TRANSPORT_LOCKS];
 static pthread_once_t serial_transport_locks_once = PTHREAD_ONCE_INIT;
 
+static modbus_t *
+request_modbus_new_rtu(const request_t *request) {
+#ifdef HAVE_MODBUS_RTU_FLOW_CONTROL
+    return modbus_new_rtu(request->serial_device,
+                          request->serial_baud,
+                          request->serial_parity,
+                          request->serial_data_bits,
+                          request->serial_stop_bits,
+                          0);
+#else
+    return modbus_new_rtu(request->serial_device,
+                          request->serial_baud,
+                          request->serial_parity,
+                          request->serial_data_bits,
+                          request->serial_stop_bits);
+#endif
+}
+
+static int
+request_modbus_read_registers(modbus_t *ctx,
+                              int address,
+                              int count,
+                              uint16_t *data) {
+#ifdef HAVE_MODBUS_UINT16_REGISTER_BUFFERS
+    return modbus_read_registers(ctx, address, count, data);
+#else
+    return modbus_read_registers(ctx, address, count, (uint8_t *)data);
+#endif
+}
+
+static int
+request_modbus_read_input_registers(modbus_t *ctx,
+                                    int address,
+                                    int count,
+                                    uint16_t *data) {
+#ifdef HAVE_MODBUS_UINT16_REGISTER_BUFFERS
+    return modbus_read_input_registers(ctx, address, count, data);
+#else
+    return modbus_read_input_registers(ctx, address, count, (uint8_t *)data);
+#endif
+}
+
+static int
+request_modbus_write_bits(modbus_t *ctx,
+                          int address,
+                          int count,
+                          const uint8_t *data) {
+#ifdef HAVE_MODBUS_UINT8_BIT_BUFFERS
+    return modbus_write_bits(ctx, address, count, data);
+#else
+    return modbus_write_bits(ctx, address, count, (const uint16_t *)data);
+#endif
+}
+
 static void
 request_init_serial_transport_locks(void) {
     for (size_t i = 0; i < SERIAL_TRANSPORT_LOCKS; i++) {
@@ -229,11 +283,7 @@ handle_request(void *arg) {
     pthread_detach(pthread_self());
 
     if (req->format == 1) {
-        ctx = modbus_new_rtu(req->serial_device,
-                             req->serial_baud,
-                             req->serial_parity,
-                             req->serial_data_bits,
-                             req->serial_stop_bits);
+        ctx = request_modbus_new_rtu(req);
     } else {
         ctx = modbus_new_tcp_pi(req->ip, req->port);
     }
@@ -274,11 +324,11 @@ handle_request(void *arg) {
             req->data[i] = coil_data[i];
         break;
     case 3:
-        result = modbus_read_registers(
+        result = request_modbus_read_registers(
             ctx, req->register_addr, req->register_count, req->data);
         break;
     case 4:
-        result = modbus_read_input_registers(
+        result = request_modbus_read_input_registers(
             ctx, req->register_addr, req->register_count, req->data);
         break;
     case 5:
@@ -292,7 +342,7 @@ handle_request(void *arg) {
     case 15:
         for (int i = 0; i < req->register_count; i++)
             coil_data[i] = req->data[i] > 0 ? TRUE : FALSE;
-        result = modbus_write_bits(
+        result = request_modbus_write_bits(
             ctx, req->register_addr, req->register_count, coil_data);
         break;
     case 16:

@@ -1,0 +1,94 @@
+name: Build Teltonika SDK images
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Teltonika SDK target to prepare
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - rut9-r
+          - rut9m-r
+          - trb1-r
+      profile:
+        description: Image profile to prepare
+        required: true
+        default: both
+        type: choice
+        options:
+          - both
+          - compiler
+          - packager
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    if: inputs.target == 'all' || inputs.target == matrix.target
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: rut9-r
+            version: 00.07.06.21
+          - target: rut9m-r
+            version: 00.07.24
+          - target: trb1-r
+            version: 00.07.24.2
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      # A vendor SDK bootstrap temporarily needs substantially more space than
+      # the final image. These directories are preinstalled on the disposable
+      # GitHub-hosted runner and are not used by this build.
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+          sudo apt-get clean
+          docker system prune --all --force
+          df -h /
+
+      - name: Log in to GitHub Container Registry
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "${{ github.actor }}" --password-stdin
+
+      - name: Build compact compiler image
+        if: inputs.profile == 'both' || inputs.profile == 'compiler'
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}/teltonika-sdk-${{ matrix.target }}:${{ matrix.version }}
+        run: ./scripts/build-teltonika-sdk-image "${{ matrix.target }}" compiler "$IMAGE"
+
+      - name: Push compact compiler image
+        if: inputs.profile == 'both' || inputs.profile == 'compiler'
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}/teltonika-sdk-${{ matrix.target }}:${{ matrix.version }}
+        run: docker push "$IMAGE"
+
+      - name: Build package-builder image
+        if: inputs.profile == 'both' || inputs.profile == 'packager'
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}/teltonika-sdk-${{ matrix.target }}-packager:${{ matrix.version }}
+        run: ./scripts/build-teltonika-sdk-image "${{ matrix.target }}" packager "$IMAGE"
+
+      - name: Push package-builder image
+        if: inputs.profile == 'both' || inputs.profile == 'packager'
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}/teltonika-sdk-${{ matrix.target }}-packager:${{ matrix.version }}
+        run: docker push "$IMAGE"
+
+      - name: Report immutable image digests
+        env:
+          COMPILER_IMAGE: ghcr.io/${{ github.repository }}/teltonika-sdk-${{ matrix.target }}:${{ matrix.version }}
+          PACKAGER_IMAGE: ghcr.io/${{ github.repository }}/teltonika-sdk-${{ matrix.target }}-packager:${{ matrix.version }}
+        run: |
+          if [ "${{ inputs.profile }}" != packager ]; then docker inspect --format='{{index .RepoDigests 0}}' "$COMPILER_IMAGE"; fi
+          if [ "${{ inputs.profile }}" != compiler ]; then docker inspect --format='{{index .RepoDigests 0}}' "$PACKAGER_IMAGE"; fi

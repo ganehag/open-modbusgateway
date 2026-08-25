@@ -57,6 +57,37 @@ AC_SUBST(MODBUS_CFLAGS)
 AC_SUBST(MODBUS_LIBS)
 AC_SUBST(MODBUS_LDFLAGS)
 
+AC_MSG_CHECKING([whether libmodbus RTU uses a flow-control argument])
+AC_COMPILE_IFELSE(
+  [AC_LANG_PROGRAM([[#include <modbus/modbus.h>]],
+    [[modbus_new_rtu("/dev/null", 9600, 'N', 8, 1, 0);]])],
+  [AC_DEFINE([HAVE_MODBUS_RTU_FLOW_CONTROL], [1],
+    [Define when modbus_new_rtu accepts a flow-control argument])
+   AC_MSG_RESULT([yes])],
+  [AC_MSG_RESULT([no])])
+
+modbus_save_CFLAGS=$CFLAGS
+CFLAGS="$CFLAGS -Werror=incompatible-pointer-types"
+AC_MSG_CHECKING([whether libmodbus register buffers use uint16_t])
+AC_COMPILE_IFELSE(
+  [AC_LANG_PROGRAM([[#include <stdint.h>
+#include <modbus/modbus.h>]],
+    [[uint16_t registers[1]; modbus_read_registers(NULL, 0, 1, registers);]])],
+  [AC_DEFINE([HAVE_MODBUS_UINT16_REGISTER_BUFFERS], [1],
+    [Define when libmodbus register APIs use uint16_t buffers])
+   AC_MSG_RESULT([yes])],
+  [AC_MSG_RESULT([no])])
+AC_MSG_CHECKING([whether libmodbus bit buffers use uint8_t])
+AC_COMPILE_IFELSE(
+  [AC_LANG_PROGRAM([[#include <stdint.h>
+#include <modbus/modbus.h>]],
+    [[uint8_t bits[1]; modbus_write_bits(NULL, 0, 1, bits);]])],
+  [AC_DEFINE([HAVE_MODBUS_UINT8_BIT_BUFFERS], [1],
+    [Define when libmodbus bit APIs use uint8_t buffers])
+   AC_MSG_RESULT([yes])],
+  [AC_MSG_RESULT([no])])
+CFLAGS=$modbus_save_CFLAGS
+
 # libmosquitto
 PKG_CHECK_MODULES([MOSQUITTO], [libmosquitto >= 1.4], dummy=yes,
   AC_MSG_ERROR("required libmosquitto >= 1.4"))

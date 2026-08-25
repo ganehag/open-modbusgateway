@@ -433,6 +433,36 @@ automation_call_interceptor(const char *handler,
 }
 
 static modbus_t *
+automation_modbus_new_rtu(const request_t *request) {
+#ifdef HAVE_MODBUS_RTU_FLOW_CONTROL
+    return modbus_new_rtu(request->serial_device,
+                          request->serial_baud,
+                          request->serial_parity,
+                          request->serial_data_bits,
+                          request->serial_stop_bits,
+                          0);
+#else
+    return modbus_new_rtu(request->serial_device,
+                          request->serial_baud,
+                          request->serial_parity,
+                          request->serial_data_bits,
+                          request->serial_stop_bits);
+#endif
+}
+
+static int
+automation_modbus_read_registers(modbus_t *ctx,
+                                 int address,
+                                 int count,
+                                 uint16_t *values) {
+#ifdef HAVE_MODBUS_UINT16_REGISTER_BUFFERS
+    return modbus_read_registers(ctx, address, count, values);
+#else
+    return modbus_read_registers(ctx, address, count, (uint8_t *)values);
+#endif
+}
+
+static modbus_t *
 automation_open_modbus(request_t *request) {
     request_t filter_request = *request;
     filter_request.register_addr++;
@@ -443,11 +473,7 @@ automation_open_modbus(request_t *request) {
     }
 
     modbus_t *ctx = request->format == 1
-                        ? modbus_new_rtu(request->serial_device,
-                                         request->serial_baud,
-                                         request->serial_parity,
-                                         request->serial_data_bits,
-                                         request->serial_stop_bits)
+                        ? automation_modbus_new_rtu(request)
                         : modbus_new_tcp_pi(request->ip, request->port);
     if (ctx == NULL) {
         return NULL;
@@ -492,7 +518,7 @@ lua_gateway_read_registers(lua_State *state) {
     }
 
     uint16_t values[125];
-    int result = modbus_read_registers(
+    int result = automation_modbus_read_registers(
         ctx, request.register_addr, request.register_count, values);
     if (result == -1) {
         const char *message = modbus_strerror(errno);
