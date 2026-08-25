@@ -48,6 +48,7 @@ test_mqtt_format1_slave_override(void) {
 
     free(captured);
     mqtt_test_release_captured_request();
+    filter_free(&config.head);
 }
 
 void
@@ -73,6 +74,7 @@ test_mqtt_format1_no_override(void) {
 
     free(captured);
     mqtt_test_release_captured_request();
+    filter_free(&config.head);
 }
 
 void
@@ -117,6 +119,7 @@ test_mqtt_format1_missing_write_payload(void) {
     CU_ASSERT_EQUAL(mqtt_test_publish_count(), 1);
     CU_ASSERT_PTR_NOT_NULL(
         strstr(mqtt_test_last_payload(), "555 ERROR: INVALID REQUEST"));
+    filter_free(&config.head);
 }
 
 void
@@ -222,6 +225,7 @@ test_mqtt_accepts_non_terminated_payload(void) {
     CU_ASSERT_EQUAL(captured->register_addr, 29);
     free(captured);
     mqtt_test_release_captured_request();
+    filter_free(&config.head);
 }
 
 void
