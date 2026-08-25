@@ -49,7 +49,14 @@ jobs:
           SDK_DIR: /opt/teltonika-sdk
         run: |
           set -eu
-          make -C "$SDK_DIR" package/libs/toolchain/compile
+          # The SDK image supplies the prebuilt toolchain. Point its package
+          # recipe at this immutable checkout so a release never builds an
+          # unrelated revision cached in the image.
+          package_makefile="$SDK_DIR/package/open-modbusgateway/Makefile"
+          sed -i "s|^PKG_SOURCE_URL:=.*|PKG_SOURCE_URL:=file://${GITHUB_WORKSPACE}|" "$package_makefile"
+          sed -i "s|^PKG_SOURCE_VERSION:=.*|PKG_SOURCE_VERSION:=${GITHUB_SHA}|" "$package_makefile"
+          rm -f "$SDK_DIR/dl/open-modbusgateway-0.4.0.tar.xz"
+          rm -rf "$SDK_DIR/build_dir"/*/open-modbusgateway-0.4.0
           make -C "$SDK_DIR" package/open-modbusgateway/compile V=s
           mkdir -p "$GITHUB_WORKSPACE/dist"
           find "$SDK_DIR/bin/packages" -type f -name 'open-modbusgateway_*.ipk' -exec cp {} "$GITHUB_WORKSPACE/dist/" \;
