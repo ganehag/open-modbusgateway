@@ -121,11 +121,14 @@ CMD ["/bin/bash"]
 
 FROM bootstrap AS gateway-dependencies
 
-# Build Open Modbus Gateway once to populate the target staging area with its
-# dependency packages. The source and all disposable object files are removed
-# below; only the compiler and installed target headers/libraries survive.
+# Populate the target staging area with Open Modbus Gateway's direct build
+# dependencies. Do not build the gateway here: release jobs supply their own
+# checked-out source revision. The source and all disposable object files are
+# removed below; only the compiler and installed target headers/libraries
+# survive.
 RUN cd "$TELTONIKA_SDK_DIR" \
-    && make package/open-modbusgateway/compile -j"$(nproc)"
+    && make package/libs/libmodbus/compile \
+        package/network/services/mosquitto/compile -j"$(nproc)"
 
 FROM gateway-dependencies AS package-builder-sdk
 
