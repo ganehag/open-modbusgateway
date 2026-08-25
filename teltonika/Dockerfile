@@ -107,7 +107,7 @@ RUN --mount=type=bind,from=compiler-sdk,source=/tmp/compiler-sdk.tar,target=/tmp
     tar -xf /tmp/compiler-sdk.tar -C "$TELTONIKA_SDK_DIR"; \
     chown -R builder:builder "$TELTONIKA_SDK_DIR"
 
-USER builder
+USER root
 
 LABEL org.opencontainers.image.title="Open Modbus Gateway Teltonika SDK" \
       org.opencontainers.image.description="Prepared Teltonika SDK toolchain; private build infrastructure" \
@@ -152,7 +152,9 @@ RUN --mount=type=bind,from=package-builder-sdk,source=/tmp/package-builder-sdk.t
     tar -xf /tmp/package-builder-sdk.tar -C "$TELTONIKA_SDK_DIR"; \
     chown -R builder:builder "$TELTONIKA_SDK_DIR"
 
-USER builder
+# GitHub Actions mounts command and state files as root. The workflow drops
+# privileges to builder for the SDK build itself.
+USER root
 
 LABEL org.opencontainers.image.title="Open Modbus Gateway Teltonika package builder" \
       org.opencontainers.image.description="Prepared Teltonika SDK with staged Open Modbus Gateway dependencies; private build infrastructure" \

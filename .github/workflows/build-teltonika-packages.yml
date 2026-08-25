@@ -70,8 +70,10 @@ jobs:
           # target-specific dependency closure already. Its fakeroot daemon
           # deadlocks in an OCI container, so write equivalent root ownership
           # directly into the IPK tar streams.
-          make -C "$SDK_DIR" package/open-modbusgateway/compile V=s \
-            QUILT=1 FAKEROOT= TAR='tar --owner=0 --group=0 --numeric-owner'
+          runuser -u builder -- env SDK_DIR="$SDK_DIR" \
+            GITHUB_WORKSPACE="$GITHUB_WORKSPACE" GITHUB_SHA="$GITHUB_SHA" \
+            bash -euc 'make -C "$SDK_DIR" package/open-modbusgateway/compile V=s \
+              QUILT=1 FAKEROOT= TAR="tar --owner=0 --group=0 --numeric-owner"'
           mkdir -p "$GITHUB_WORKSPACE/dist"
           find "$SDK_DIR/bin/packages" -type f -name 'open-modbusgateway_*.ipk' -exec cp {} "$GITHUB_WORKSPACE/dist/" \;
           test "$(find "$GITHUB_WORKSPACE/dist" -type f -name '*.ipk' | wc -l)" -eq 1
