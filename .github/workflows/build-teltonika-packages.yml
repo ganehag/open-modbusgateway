@@ -21,22 +21,30 @@ permissions:
   packages: read
 
 jobs:
+  select-targets:
+    runs-on: ubuntu-latest
+    outputs:
+      targets: ${{ steps.matrix.outputs.targets }}
+    steps:
+      - id: matrix
+        env:
+          REQUESTED_TARGET: ${{ inputs.target || 'all' }}
+        run: |
+          case "$REQUESTED_TARGET" in
+            all) echo 'targets={"target":["rut9-r","rut9m-r","trb1-r"]}' >> "$GITHUB_OUTPUT" ;;
+            rut9-r|rut9m-r|trb1-r) echo "targets={\"target\":[\"$REQUESTED_TARGET\"]}" >> "$GITHUB_OUTPUT" ;;
+            *) echo "unsupported target: $REQUESTED_TARGET" >&2; exit 2 ;;
+          esac
+
   build:
-    if: github.event_name == 'release' || inputs.target == 'all' || inputs.target == matrix.target
+    needs: select-targets
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - target: rut9-r
-            sdk_version: 00.07.06.21
-          - target: rut9m-r
-            sdk_version: 00.07.24
-          - target: trb1-r
-            sdk_version: 00.07.24.2
+      matrix: ${{ fromJSON(needs.select-targets.outputs.targets) }}
     container:
-      image: ghcr.io/${{ github.repository }}/teltonika-sdk-${{ matrix.target }}-packager:${{ matrix.sdk_version }}
+      image: ghcr.io/${{ github.repository }}/teltonika-sdk-${{ matrix.target }}-packager:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}

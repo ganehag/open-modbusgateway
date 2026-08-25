@@ -29,7 +29,6 @@ permissions:
 
 jobs:
   build:
-    if: inputs.target == 'all' || inputs.target == matrix.target
     runs-on: ubuntu-latest
     timeout-minutes: 360
     strategy:
@@ -37,19 +36,18 @@ jobs:
       matrix:
         include:
           - target: rut9-r
-            version: 00.07.06.21
           - target: rut9m-r
-            version: 00.07.24
           - target: trb1-r
-            version: 00.07.24.2
     steps:
       - name: Check out source
+        if: inputs.target == 'all' || inputs.target == matrix.target
         uses: actions/checkout@v4
 
       # A vendor SDK bootstrap temporarily needs substantially more space than
       # the final image. These directories are preinstalled on the disposable
       # GitHub-hosted runner and are not used by this build.
       - name: Free runner disk space
+        if: inputs.target == 'all' || inputs.target == matrix.target
         run: |
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
           sudo apt-get clean
@@ -57,38 +55,50 @@ jobs:
           df -h /
 
       - name: Log in to GitHub Container Registry
+        if: inputs.target == 'all' || inputs.target == matrix.target
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "${{ github.actor }}" --password-stdin
 
       - name: Build compact compiler image
-        if: inputs.profile == 'both' || inputs.profile == 'compiler'
+        if: (inputs.profile == 'both' || inputs.profile == 'compiler') && (inputs.target == 'all' || inputs.target == matrix.target)
         env:
-          IMAGE: ghcr.io/${{ github.repository }}/teltonika-sdk-${{ matrix.target }}:${{ matrix.version }}
+          IMAGE: ghcr.io/${{ github.repository }}/teltonika-sdk-${{ matrix.target }}:latest
         run: ./scripts/build-teltonika-sdk-image "${{ matrix.target }}" compiler "$IMAGE"
 
       - name: Push compact compiler image
-        if: inputs.profile == 'both' || inputs.profile == 'compiler'
+        if: (inputs.profile == 'both' || inputs.profile == 'compiler') && (inputs.target == 'all' || inputs.target == matrix.target)
         env:
-          IMAGE: ghcr.io/${{ github.repository }}/teltonika-sdk-${{ matrix.target }}:${{ matrix.version }}
-        run: docker push "$IMAGE"
+          IMAGE: ghcr.io/${{ github.repository }}/teltonika-sdk-${{ matrix.target }}:latest
+        run: |
+          . teltonika/targets.sh
+          teltonika_target "${{ matrix.target }}"
+          docker tag "$IMAGE" "${IMAGE%:latest}:$SDK_VERSION"
+          docker push "$IMAGE"
+          docker push "${IMAGE%:latest}:$SDK_VERSION"
 
       - name: Build package-builder image
-        if: inputs.profile == 'both' || inputs.profile == 'packager'
+        if: (inputs.profile == 'both' || inputs.profile == 'packager') && (inputs.target == 'all' || inputs.target == matrix.target)
         env:
-          IMAGE: ghcr.io/${{ github.repository }}/teltonika-sdk-${{ matrix.target }}-packager:${{ matrix.version }}
+          IMAGE: ghcr.io/${{ github.repository }}/teltonika-sdk-${{ matrix.target }}-packager:latest
         run: ./scripts/build-teltonika-sdk-image "${{ matrix.target }}" packager "$IMAGE"
 
       - name: Push package-builder image
-        if: inputs.profile == 'both' || inputs.profile == 'packager'
+        if: (inputs.profile == 'both' || inputs.profile == 'packager') && (inputs.target == 'all' || inputs.target == matrix.target)
         env:
-          IMAGE: ghcr.io/${{ github.repository }}/teltonika-sdk-${{ matrix.target }}-packager:${{ matrix.version }}
-        run: docker push "$IMAGE"
+          IMAGE: ghcr.io/${{ github.repository }}/teltonika-sdk-${{ matrix.target }}-packager:latest
+        run: |
+          . teltonika/targets.sh
+          teltonika_target "${{ matrix.target }}"
+          docker tag "$IMAGE" "${IMAGE%:latest}:$SDK_VERSION"
+          docker push "$IMAGE"
+          docker push "${IMAGE%:latest}:$SDK_VERSION"
 
       - name: Report immutable image digests
+        if: inputs.target == 'all' || inputs.target == matrix.target
         env:
-          COMPILER_IMAGE: ghcr.io/${{ github.repository }}/teltonika-sdk-${{ matrix.target }}:${{ matrix.version }}
-          PACKAGER_IMAGE: ghcr.io/${{ github.repository }}/teltonika-sdk-${{ matrix.target }}-packager:${{ matrix.version }}
+          COMPILER_IMAGE: ghcr.io/${{ github.repository }}/teltonika-sdk-${{ matrix.target }}:latest
+          PACKAGER_IMAGE: ghcr.io/${{ github.repository }}/teltonika-sdk-${{ matrix.target }}-packager:latest
         run: |
           if [ "${{ inputs.profile }}" != packager ]; then docker inspect --format='{{index .RepoDigests 0}}' "$COMPILER_IMAGE"; fi
           if [ "${{ inputs.profile }}" != compiler ]; then docker inspect --format='{{index .RepoDigests 0}}' "$PACKAGER_IMAGE"; fi
