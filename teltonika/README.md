@@ -23,17 +23,25 @@ The currently pinned SDK lines are:
 | `rut9m-r` | RUT951, RUT956 | RUT9M_R 00.07.24 | `mipsel_24kc` |
 | `trb1-r` | TRB140–TRB145 | TRB1_R 00.07.24.2 | ARM Cortex-A7 |
 
-Build an image locally with:
+Build and publish an image locally with:
 
 ```sh
-./scripts/build-teltonika-sdk-image rut9-r package-builder ghcr.io/ganehag/open-modbusgateway/teltonika-sdk-rut9-r-package-builder:latest
+target=rut9-r
+version=00.07.06.21
+image="ghcr.io/ganehag/open-modbusgateway/teltonika-sdk-${target}-package-builder"
+
+./scripts/build-teltonika-sdk-image "$target" package-builder "$image:latest"
+docker tag "$image:latest" "$image:$version"
+docker push "$image:latest"
+docker push "$image:$version"
 ```
 
-The preferred path is the manually triggered `Build Teltonika SDK images`
-workflow. It uses the repository `GITHUB_TOKEN` to publish a private GHCR
-package. The workflow publishes `latest` for each target, plus a version tag
-derived from the verified manifest. Release package builds use `latest` so a
-firmware refresh changes only `targets.sh`, not the workflow structure.
+Run that command once per target after a vendor SDK line changes. It downloads
+the archive only when it is not already in `teltonika/downloads`, verifies both
+vendor MD5 and the pinned SHA-256, and creates a compact image. The build stays
+on the maintainer machine: GitHub Actions only pulls the finished image to make
+an IPK. Publish both `latest` and the SDK version tag; release package builds
+use `latest`, while the version tag is the retained, reproducible reference.
 
 `Build Teltonika packages` is the release workflow. It runs the OpenWrt package
 recipe inside the matching image and attaches the three IPKs to a published
