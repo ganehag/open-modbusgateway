@@ -92,7 +92,7 @@ RUN cd "$TELTONIKA_SDK_DIR" \
     && rm -rf dl logs build_dir \
     && rm -rf staging_dir/host/opt staging_dir/toolchain-*/initial \
     && tar -C "$TELTONIKA_SDK_DIR" -cf /tmp/compiler-sdk.tar \
-        .config Config.in Makefile rules.mk version ipk_packages.json \
+        .config Config.in Makefile rules.mk version \
         feeds.conf.default feeds.lock \
         include package target toolchain tools scripts feeds staging_dir tmp
 
@@ -136,7 +136,7 @@ RUN cd "$TELTONIKA_SDK_DIR" \
     && rm -rf logs \
     && rm -rf staging_dir/host/opt staging_dir/toolchain-*/initial \
     && tar -C "$TELTONIKA_SDK_DIR" -cf /tmp/package-builder-sdk.tar \
-        .config Config.in Makefile rules.mk version ipk_packages.json \
+        .config Config.in Makefile rules.mk version \
         feeds.conf.default feeds.lock \
         bin include package target toolchain tools scripts feeds staging_dir tmp \
         build_dir/target-*
