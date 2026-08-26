@@ -128,7 +128,7 @@ FROM bootstrap AS gateway-dependencies
 # survive.
 RUN cd "$TELTONIKA_SDK_DIR" \
     && make package/libs/libmodbus/compile \
-        package/network/services/mosquitto/compile -j"$(nproc)"
+        package/network/services/mosquitto/compile -j"$(nproc)" FAKEROOT=
 
 FROM gateway-dependencies AS package-builder-sdk
 
