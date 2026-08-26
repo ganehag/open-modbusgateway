@@ -72,7 +72,7 @@ jobs:
           # directly into the IPK tar streams.
           runuser -u builder -- env HOME=/home/builder SDK_DIR="$SDK_DIR" \
             GITHUB_WORKSPACE="$GITHUB_WORKSPACE" GITHUB_SHA="$GITHUB_SHA" \
-            bash -euc 'git config --global --add safe.directory "$GITHUB_WORKSPACE"; \
+            bash -euc 'git config --global --add safe.directory "$GITHUB_WORKSPACE/.git"; \
               make -C "$SDK_DIR" package/open-modbusgateway/compile V=s \
               QUILT=1 FAKEROOT= TAR="tar --owner=0 --group=0 --numeric-owner"'
           mkdir -p "$GITHUB_WORKSPACE/dist"
