@@ -10,60 +10,10 @@
 #include "mqtt_test_helpers.h"
 #include "test.h"
 
-extern FILE *logfile;
-
-static void
-silence_logs(void) {
-    set_logfile("/dev/null");
-}
-
-static void
-setup_basic_config(config_t *config, serial_gateway_t *gateway) {
-    memset(config, 0, sizeof(*config));
-    memset(gateway, 0, sizeof(*gateway));
-
-    strncpy(
-        config->response_topic, "response", sizeof(config->response_topic) - 1);
-    config->serial_head = gateway;
-    config->head = NULL;
-
-    strncpy(gateway->id, "ttyusb0", sizeof(gateway->id) - 1);
-    strncpy(gateway->device, "/dev/ttyUSB0", sizeof(gateway->device) - 1);
-    gateway->baudrate = 9600;
-    gateway->parity = 'N';
-    gateway->data_bits = 8;
-    gateway->stop_bits = 1;
-    gateway->next = NULL;
-}
-
-static void
-add_serial_filter(config_t *config,
-                  const char *serial_id,
-                  uint8_t slave_id,
-                  uint8_t function,
-                  uint16_t reg_min,
-                  uint16_t reg_max) {
-    filter_t *filter = calloc(1, sizeof(filter_t));
-    filter->applies_serial = 1;
-    if (serial_id != NULL) {
-        strncpy(filter->serial_id, serial_id, sizeof(filter->serial_id) - 1);
-    }
-    filter->slave_id = slave_id;
-    filter->function_code = function;
-    filter->register_address_min = reg_min;
-    filter->register_address_max = reg_max;
-    filter_add(&config->head, filter);
-}
-
-static struct mosquitto_message
-make_message(const char *payload) {
-    struct mosquitto_message msg;
-    memset(&msg, 0, sizeof(msg));
-    msg.payload = (void *)payload;
-    msg.payloadlen = (int)strlen(payload);
-    msg.topic = "request";
-    return msg;
-}
+#define silence_logs mqtt_test_silence_logs
+#define setup_basic_config mqtt_test_setup_serial_config
+#define add_serial_filter mqtt_test_add_serial_filter
+#define make_message mqtt_test_make_message
 
 void
 test_mqtt_format1_slave_override(void) {
@@ -74,6 +24,7 @@ test_mqtt_format1_slave_override(void) {
     serial_gateway_t gateway;
     setup_basic_config(&config, &gateway);
     gateway.slave_id = 17;
+    add_serial_filter(&config, "ttyusb0", 17, 3, 0, 65535);
 
     const char *payload = "1 42 ttyusb0 5 9 3 10 2";
     struct mosquitto_message msg = make_message(payload);
@@ -97,6 +48,7 @@ test_mqtt_format1_slave_override(void) {
 
     free(captured);
     mqtt_test_release_captured_request();
+    filter_free(&config.head);
 }
 
 void
@@ -108,6 +60,7 @@ test_mqtt_format1_no_override(void) {
     serial_gateway_t gateway;
     setup_basic_config(&config, &gateway);
     gateway.slave_id = 0; // allow payload value
+    add_serial_filter(&config, "ttyusb0", 12, 4, 0, 65535);
 
     const char *payload = "1 99 ttyusb0 5 12 4 20 3";
     struct mosquitto_message msg = make_message(payload);
@@ -121,6 +74,7 @@ test_mqtt_format1_no_override(void) {
 
     free(captured);
     mqtt_test_release_captured_request();
+    filter_free(&config.head);
 }
 
 void
@@ -131,6 +85,7 @@ test_mqtt_format1_reject_extra_token(void) {
     config_t config;
     serial_gateway_t gateway;
     setup_basic_config(&config, &gateway);
+
     gateway.slave_id = 5;
 
     const char *payload = "1 123 ttyusb0:override 5 9 3 10 2";
@@ -153,6 +108,7 @@ test_mqtt_format1_missing_write_payload(void) {
     config_t config;
     serial_gateway_t gateway;
     setup_basic_config(&config, &gateway);
+    add_serial_filter(&config, "ttyusb0", 7, 3, 0, 65535);
 
     const char *payload = "1 555 ttyusb0 5 7 16 30 2";
     struct mosquitto_message msg = make_message(payload);
@@ -163,6 +119,7 @@ test_mqtt_format1_missing_write_payload(void) {
     CU_ASSERT_EQUAL(mqtt_test_publish_count(), 1);
     CU_ASSERT_PTR_NOT_NULL(
         strstr(mqtt_test_last_payload(), "555 ERROR: INVALID REQUEST"));
+    filter_free(&config.head);
 }
 
 void
@@ -249,6 +206,7 @@ test_mqtt_accepts_non_terminated_payload(void) {
     config_t config;
     serial_gateway_t gateway;
     setup_basic_config(&config, &gateway);
+    add_serial_filter(&config, "ttyusb0", 7, 3, 0, 65535);
 
     char payload[] = {'1', ' ', '9', '0', '3', ' ', 't', 't',
                       'y', 'u', 's', 'b', '0', ' ', '5', ' ',
@@ -267,6 +225,7 @@ test_mqtt_accepts_non_terminated_payload(void) {
     CU_ASSERT_EQUAL(captured->register_addr, 29);
     free(captured);
     mqtt_test_release_captured_request();
+    filter_free(&config.head);
 }
 
 void
@@ -293,4 +252,67 @@ test_mqtt_rejects_invalid_tcp_address(void) {
     CU_ASSERT_PTR_NULL(mqtt_test_captured_request());
     CU_ASSERT_PTR_NOT_NULL(
         strstr(mqtt_test_last_payload(), "905 ERROR: INVALID REQUEST"));
+}
+
+void
+test_mqtt_rejects_malformed_numeric_fields(void) {
+    silence_logs();
+    mqtt_test_reset();
+
+    config_t config;
+    serial_gateway_t gateway;
+    setup_basic_config(&config, &gateway);
+
+    const char *overflow_address = "1 905 ttyusb0 5 7 3 4294967296 1";
+    struct mosquitto_message msg = make_message(overflow_address);
+    mqtt_message_callback(NULL, &config, &msg);
+    CU_ASSERT_PTR_NULL(mqtt_test_captured_request());
+    CU_ASSERT_PTR_NOT_NULL(
+        strstr(mqtt_test_last_payload(), "905 ERROR: INVALID REQUEST"));
+
+    mqtt_test_reset();
+    const char *overflow_cookie = "1 18446744073709551616 ttyusb0 5 7 3 1 1";
+    msg = make_message(overflow_cookie);
+    mqtt_message_callback(NULL, &config, &msg);
+    CU_ASSERT_PTR_NULL(mqtt_test_captured_request());
+    CU_ASSERT_PTR_NOT_NULL(
+        strstr(mqtt_test_last_payload(), "0 ERROR: INVALID REQUEST"));
+
+    mqtt_test_reset();
+    const char *trailing_field = "1 906 ttyusb0 5 7 3 1 1 unexpected extra";
+    msg = make_message(trailing_field);
+    mqtt_message_callback(NULL, &config, &msg);
+    CU_ASSERT_PTR_NULL(mqtt_test_captured_request());
+    CU_ASSERT_PTR_NOT_NULL(
+        strstr(mqtt_test_last_payload(), "906 ERROR: INVALID REQUEST"));
+}
+
+void
+test_mqtt_parser_malformed_input_smoke(void) {
+    silence_logs();
+
+    config_t config;
+    serial_gateway_t gateway;
+    setup_basic_config(&config, &gateway);
+
+    unsigned int state = 0x87654321U;
+    char payload[96];
+    for (size_t iteration = 0; iteration < 256; iteration++) {
+        for (size_t i = 0; i < sizeof(payload) - 1; i++) {
+            state = state * 1664525U + 1013904223U;
+            payload[i] = (char)(32 + (state % 95));
+        }
+        payload[sizeof(payload) - 1] = '\0';
+
+        mqtt_test_reset();
+        struct mosquitto_message msg = {
+            .payload = payload,
+            .payloadlen = (int)strlen(payload),
+            .topic = "request",
+        };
+        mqtt_message_callback(NULL, &config, &msg);
+        request_t *captured = mqtt_test_captured_request();
+        free(captured);
+        mqtt_test_release_captured_request();
+    }
 }

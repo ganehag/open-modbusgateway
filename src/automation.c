@@ -18,6 +18,7 @@
 #include "filters.h"
 #include "log.h"
 #include "mqtt_client.h"
+#include "request.h"
 
 #define AUTOMATION_INSTRUCTION_LIMIT 100000
 #define AUTOMATION_MEMORY_LIMIT (1024U * 1024U)
@@ -432,6 +433,36 @@ automation_call_interceptor(const char *handler,
 }
 
 static modbus_t *
+automation_modbus_new_rtu(const request_t *request) {
+#ifdef HAVE_MODBUS_RTU_FLOW_CONTROL
+    return modbus_new_rtu(request->serial_device,
+                          request->serial_baud,
+                          request->serial_parity,
+                          request->serial_data_bits,
+                          request->serial_stop_bits,
+                          0);
+#else
+    return modbus_new_rtu(request->serial_device,
+                          request->serial_baud,
+                          request->serial_parity,
+                          request->serial_data_bits,
+                          request->serial_stop_bits);
+#endif
+}
+
+static int
+automation_modbus_read_registers(modbus_t *ctx,
+                                 int address,
+                                 int count,
+                                 uint16_t *values) {
+#ifdef HAVE_MODBUS_UINT16_REGISTER_BUFFERS
+    return modbus_read_registers(ctx, address, count, values);
+#else
+    return modbus_read_registers(ctx, address, count, (uint8_t *)values);
+#endif
+}
+
+static modbus_t *
 automation_open_modbus(request_t *request) {
     request_t filter_request = *request;
     filter_request.register_addr++;
@@ -442,22 +473,27 @@ automation_open_modbus(request_t *request) {
     }
 
     modbus_t *ctx = request->format == 1
-                        ? modbus_new_rtu(request->serial_device,
-                                         request->serial_baud,
-                                         request->serial_parity,
-                                         request->serial_data_bits,
-                                         request->serial_stop_bits)
+                        ? automation_modbus_new_rtu(request)
                         : modbus_new_tcp_pi(request->ip, request->port);
     if (ctx == NULL) {
         return NULL;
     }
     modbus_set_response_timeout(ctx, request->timeout, 0);
     modbus_set_slave(ctx, request->slave_id);
+    request_transport_lock(request);
     if (modbus_connect(ctx) == -1) {
         modbus_free(ctx);
+        request_transport_unlock(request);
         return NULL;
     }
     return ctx;
+}
+
+static void
+automation_close_modbus(const request_t *request, modbus_t *ctx) {
+    modbus_close(ctx);
+    modbus_free(ctx);
+    request_transport_unlock(request);
 }
 
 static int
@@ -482,18 +518,16 @@ lua_gateway_read_registers(lua_State *state) {
     }
 
     uint16_t values[125];
-    int result = modbus_read_registers(
+    int result = automation_modbus_read_registers(
         ctx, request.register_addr, request.register_count, values);
     if (result == -1) {
         const char *message = modbus_strerror(errno);
-        modbus_close(ctx);
-        modbus_free(ctx);
+        automation_close_modbus(&request, ctx);
         lua_pushnil(state);
         lua_pushstring(state, message);
         return 2;
     }
-    modbus_close(ctx);
-    modbus_free(ctx);
+    automation_close_modbus(&request, ctx);
     lua_newtable(state);
     for (int i = 0; i < result; i++) {
         lua_pushinteger(state, values[i]);
@@ -540,14 +574,12 @@ lua_gateway_write_registers(lua_State *state) {
         ctx, request.register_addr, request.register_count, request.data);
     if (result == -1) {
         const char *message = modbus_strerror(errno);
-        modbus_close(ctx);
-        modbus_free(ctx);
+        automation_close_modbus(&request, ctx);
         lua_pushnil(state);
         lua_pushstring(state, message);
         return 2;
     }
-    modbus_close(ctx);
-    modbus_free(ctx);
+    automation_close_modbus(&request, ctx);
     lua_pushboolean(state, 1);
     return 1;
 }
@@ -614,14 +646,12 @@ lua_gateway_write_registers_to(lua_State *state) {
         ctx, request.register_addr, request.register_count, request.data);
     if (result == -1) {
         const char *message = modbus_strerror(errno);
-        modbus_close(ctx);
-        modbus_free(ctx);
+        automation_close_modbus(&request, ctx);
         lua_pushnil(state);
         lua_pushstring(state, message);
         return 2;
     }
-    modbus_close(ctx);
-    modbus_free(ctx);
+    automation_close_modbus(&request, ctx);
     lua_pushboolean(state, 1);
     return 1;
 }

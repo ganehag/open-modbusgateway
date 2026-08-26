@@ -1,6 +1,7 @@
 config mqtt
 	option host '127.0.0.1'
 	option port '1883'
+	option max_inflight_requests '20'
 	option request_topic 'request'
 	option response_topic 'response'
 

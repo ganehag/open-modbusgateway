@@ -1,0 +1,7 @@
+*
+!teltonika/
+!teltonika/Dockerfile
+!teltonika/downloads/
+!teltonika/downloads/**
+!openwrt/
+!openwrt/**

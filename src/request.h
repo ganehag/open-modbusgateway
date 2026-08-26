@@ -34,7 +34,7 @@ typedef struct {
 #define IP_TYPE_IPV6 1
 #define IP_TYPE_HOSTNAME 2
 
-#define MAX_REQUEST_THREADS 20 // TODO: Make this configurable
+#define DEFAULT_MAX_INFLIGHT_REQUESTS 20
 #define RTU_DEFAULT_BAUD 9600
 #define RTU_DEFAULT_PARITY 'N'
 #define RTU_DEFAULT_DATA_BITS 8
@@ -47,5 +47,9 @@ void *handle_request(void *arg);
 int request_thread_reserve(void);
 void request_thread_release(void);
 int request_wait_for_completion(unsigned int timeout_ms);
+void request_set_inflight_limit(unsigned int limit);
+void request_transport_lock(const request_t *request);
+void request_transport_unlock(const request_t *request);
+int request_validate_modbus(const request_t *request, int one_based_address);
 
 #endif

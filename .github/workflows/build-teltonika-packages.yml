@@ -1,0 +1,104 @@
+name: Build Teltonika packages
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Teltonika package target to build
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - rut9-r
+          - rut9m-r
+          - trb1-r
+
+permissions:
+  contents: write
+  packages: read
+
+jobs:
+  select-targets:
+    runs-on: ubuntu-latest
+    outputs:
+      targets: ${{ steps.matrix.outputs.targets }}
+    steps:
+      - id: matrix
+        env:
+          REQUESTED_TARGET: ${{ inputs.target || 'all' }}
+        run: |
+          case "$REQUESTED_TARGET" in
+            all) echo 'targets={"target":["rut9-r","rut9m-r","trb1-r"]}' >> "$GITHUB_OUTPUT" ;;
+            rut9-r|rut9m-r|trb1-r) echo "targets={\"target\":[\"$REQUESTED_TARGET\"]}" >> "$GITHUB_OUTPUT" ;;
+            *) echo "unsupported target: $REQUESTED_TARGET" >&2; exit 2 ;;
+          esac
+
+  build:
+    needs: select-targets
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.select-targets.outputs.targets) }}
+    container:
+      image: ghcr.io/${{ github.repository }}/teltonika-sdk-${{ matrix.target }}-package-builder:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@v4
+
+      - name: Build OpenWrt package
+        env:
+          SDK_DIR: /opt/teltonika-sdk
+        run: |
+          set -eu
+          # The SDK image supplies the prebuilt toolchain. Point its package
+          # recipe at this immutable checkout so a release never builds an
+          # unrelated revision cached in the image.
+          package_makefile="$SDK_DIR/package/open-modbusgateway/Makefile"
+          sed -i "s|^PKG_SOURCE_URL:=.*|PKG_SOURCE_URL:=file://${GITHUB_WORKSPACE}|" "$package_makefile"
+          sed -i "s|^PKG_SOURCE_VERSION:=.*|PKG_SOURCE_VERSION:=${GITHUB_SHA}|" "$package_makefile"
+          rm -f "$SDK_DIR/dl/open-modbusgateway-0.4.0.tar.xz"
+          rm -rf "$SDK_DIR/build_dir"/*/open-modbusgateway-0.4.0
+          # Teltonika's package rules omit recursive dependency builds in
+          # QUILT mode. The package-builder image supplies that complete,
+          # target-specific dependency closure already. Its fakeroot daemon
+          # deadlocks in an OCI container, so write equivalent root ownership
+          # directly into the IPK tar streams.
+          runuser -u builder -- env HOME=/home/builder SDK_DIR="$SDK_DIR" \
+            GITHUB_WORKSPACE="$GITHUB_WORKSPACE" GITHUB_SHA="$GITHUB_SHA" \
+            bash -euc 'git config --global --add safe.directory "$GITHUB_WORKSPACE/.git"; \
+              make -C "$SDK_DIR" package/open-modbusgateway/compile V=s \
+              QUILT=1 FAKEROOT= TAR="tar --owner=0 --group=0 --numeric-owner"'
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+          find "$SDK_DIR/bin/packages" -type f -name 'open-modbusgateway_*.ipk' -exec cp {} "$GITHUB_WORKSPACE/dist/" \;
+          test "$(find "$GITHUB_WORKSPACE/dist" -type f -name '*.ipk' | wc -l)" -eq 1
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: open-modbusgateway-${{ matrix.target }}
+          path: dist/*.ipk
+          if-no-files-found: error
+
+  publish:
+    if: github.event_name == 'release' && success()
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download package artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: open-modbusgateway-*
+          merge-multiple: true
+
+      - name: Attach packages to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" dist/*.ipk --clobber

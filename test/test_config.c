@@ -64,8 +64,9 @@ const char file_content_serial_rule[] = "config rule\n"
                                         "    option function '3'\n"
                                         "    option register_address '0-10'\n";
 
-const char file_content_automation[] = "config automation\n"
-                                      "    option script '/etc/openmmg/automation.lua'\n";
+const char file_content_automation[] =
+    "config automation\n"
+    "    option script '/etc/openmmg/automation.lua'\n";
 
 static void
 config_free_lists(config_t *config) {
@@ -223,7 +224,8 @@ test_validate_config_without_rules(void) {
     config.qos = 0;
     strncpy(config.client_id, "test-client", sizeof(config.client_id) - 1);
     strncpy(config.request_topic, "request", sizeof(config.request_topic) - 1);
-    strncpy(config.response_topic, "response", sizeof(config.response_topic) - 1);
+    strncpy(
+        config.response_topic, "response", sizeof(config.response_topic) - 1);
 
     CU_ASSERT_EQUAL(validate_config(&config), 0);
 }
@@ -252,6 +254,92 @@ test_validate_config_tls_options(void) {
 
     strncpy(config.key_path, "client.key", sizeof(config.key_path) - 1);
     CU_ASSERT_EQUAL(validate_config(&config), 0);
+}
+
+void
+test_config_rejects_legacy_tls(void) {
+    FILE *file = tmpfile();
+    CU_ASSERT_PTR_NOT_NULL_FATAL(file);
+
+    fprintf(file,
+            "config mqtt\n"
+            "\toption tls_version 'tlsv1.1'\n");
+    rewind(file);
+
+    config_t config;
+    memset(&config, 0, sizeof(config));
+    CU_ASSERT_EQUAL(config_parse_file(file, &config),
+                    CONFIG_PARSER_ERROR_INVALID_TLS_VERSION);
+    fclose(file);
+}
+
+void
+test_config_parses_request_limit(void) {
+    FILE *file = tmpfile();
+    CU_ASSERT_PTR_NOT_NULL_FATAL(file);
+
+    fprintf(file,
+            "config mqtt\n"
+            "\toption max_inflight_requests '7'\n");
+    rewind(file);
+
+    config_t config;
+    memset(&config, 0, sizeof(config));
+    CU_ASSERT_EQUAL(config_parse_file(file, &config), 0);
+    CU_ASSERT_EQUAL(config.max_inflight_requests, 7);
+    fclose(file);
+}
+
+void
+test_config_rejects_unknown_or_malformed_options(void) {
+    FILE *file = tmpfile();
+    CU_ASSERT_PTR_NOT_NULL_FATAL(file);
+
+    fprintf(file,
+            "config mqtt\n"
+            "\toption port_extra '1883'\n");
+    rewind(file);
+
+    config_t config;
+    memset(&config, 0, sizeof(config));
+    CU_ASSERT_EQUAL(config_parse_file(file, &config), CONFIG_PARSER_ERROR);
+    fclose(file);
+
+    file = tmpfile();
+    CU_ASSERT_PTR_NOT_NULL_FATAL(file);
+    fprintf(file,
+            "config mqtt\n"
+            "\toption port '1883oops'\n");
+    rewind(file);
+    memset(&config, 0, sizeof(config));
+    CU_ASSERT_EQUAL(config_parse_file(file, &config),
+                    CONFIG_PARSER_ERROR_INVALID_PORT);
+    fclose(file);
+}
+
+void
+test_config_parser_malformed_input_smoke(void) {
+    unsigned int state = 0x12345678U;
+    char input[96];
+
+    for (size_t iteration = 0; iteration < 128; iteration++) {
+        for (size_t i = 0; i < sizeof(input) - 1; i++) {
+            state = state * 1103515245U + 12345U;
+            input[i] = (char)(32 + (state % 95));
+        }
+        input[sizeof(input) - 1] = '\0';
+
+        FILE *file = tmpfile();
+        CU_ASSERT_PTR_NOT_NULL_FATAL(file);
+        fputs(input, file);
+        rewind(file);
+
+        config_t config;
+        memset(&config, 0, sizeof(config));
+        (void)config_parse_file(file, &config);
+        config_free_lists(&config);
+        fclose(file);
+    }
 }
 
 void

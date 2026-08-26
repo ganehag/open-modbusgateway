@@ -9,6 +9,8 @@
 #include <string.h>
 
 #include "../src/mqtt_client.h"
+#include "../src/filters.h"
+#include "../src/log.h"
 #include "../src/request.h"
 
 static int publish_count = 0;
@@ -18,6 +20,59 @@ static int last_rc = MOSQ_ERR_SUCCESS;
 
 static request_t *captured_request = NULL;
 
+void
+mqtt_test_silence_logs(void) {
+    set_logfile("/dev/null");
+}
+
+void
+mqtt_test_setup_serial_config(config_t *config, serial_gateway_t *gateway) {
+    memset(config, 0, sizeof(*config));
+    memset(gateway, 0, sizeof(*gateway));
+
+    strncpy(config->response_topic,
+            "response",
+            sizeof(config->response_topic) - 1);
+    config->serial_head = gateway;
+    strncpy(gateway->id, "ttyusb0", sizeof(gateway->id) - 1);
+    strncpy(gateway->device, "/dev/ttyUSB0", sizeof(gateway->device) - 1);
+    gateway->baudrate = 9600;
+    gateway->parity = 'N';
+    gateway->data_bits = 8;
+    gateway->stop_bits = 1;
+}
+
+void
+mqtt_test_add_serial_filter(config_t *config,
+                            const char *serial_id,
+                            uint8_t slave_id,
+                            uint8_t function,
+                            uint16_t reg_min,
+                            uint16_t reg_max) {
+    filter_t *filter = calloc(1, sizeof(*filter));
+    if (filter == NULL) {
+        return;
+    }
+    filter->applies_serial = 1;
+    if (serial_id != NULL) {
+        strncpy(filter->serial_id, serial_id, sizeof(filter->serial_id) - 1);
+    }
+    filter->slave_id = slave_id;
+    filter->function_code = function;
+    filter->register_address_min = reg_min;
+    filter->register_address_max = reg_max;
+    filter_add(&config->head, filter);
+}
+
+struct mosquitto_message
+mqtt_test_make_message(const char *payload) {
+    struct mosquitto_message message = {0};
+    message.payload = (void *)payload;
+    message.payloadlen = (int)strlen(payload);
+    message.topic = "request";
+    return message;
+}
+
 int
 request_thread_reserve(void) {
     return 1;
@@ -25,6 +80,25 @@ request_thread_reserve(void) {
 
 void
 request_thread_release(void) {}
+
+void
+request_transport_lock(const request_t *request) {
+    (void)request;
+}
+
+void
+request_transport_unlock(const request_t *request) {
+    (void)request;
+}
+
+int
+request_validate_modbus(const request_t *request, int one_based_address) {
+    if (request == NULL || request->timeout == 0 || request->slave_id == 0 ||
+        (one_based_address && request->register_addr == 0)) {
+        return -1;
+    }
+    return 0;
+}
 
 void
 mqtt_test_reset(void) {
@@ -75,6 +149,18 @@ mosquitto_subscribe(struct mosquitto *mosq,
     (void)sub;
     (void)qos;
     return MOSQ_ERR_SUCCESS;
+}
+
+const char *
+mosquitto_strerror(int mosq_errno) {
+    (void)mosq_errno;
+    return "mock MQTT error";
+}
+
+const char *
+mosquitto_connack_string(int connack_code) {
+    (void)connack_code;
+    return "mock connection rejected";
 }
 
 int

@@ -1,0 +1,7 @@
+config OPEN_MODBUSGATEWAY_LUA
+	bool "Enable Lua automation support"
+	depends on PACKAGE_open-modbusgateway
+	help
+	  Build Lua automation support into open-modbusgateway. This adds the
+	  liblua5.4 runtime dependency. Leave disabled for a smaller gateway without
+	  script automation.

@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ "$#" -ne 3 ]; then
+    echo "usage: $0 <rut9-r|rut9m-r|trb1-r> <compiler|package-builder> <image-reference>" >&2
+    exit 2
+fi
+
+target=$1
+profile=$2
+image_reference=$3
+repository_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+
+# shellcheck source=teltonika/targets.sh
+. "$repository_root/teltonika/targets.sh"
+teltonika_target "$target"
+
+case "$profile" in
+compiler|package-builder) ;;
+*)
+    echo "unknown image profile: $profile" >&2
+    echo "supported profiles: compiler, package-builder" >&2
+    exit 2
+    ;;
+esac
+
+download_dir="$repository_root/teltonika/downloads"
+archive_path="$download_dir/$SDK_ARCHIVE"
+mkdir -p "$download_dir"
+
+if [ ! -f "$archive_path" ]; then
+    temporary_archive="$archive_path.part"
+    trap 'rm -f "$temporary_archive"' EXIT
+    curl --fail --location --retry 3 --output "$temporary_archive" "$SDK_URL"
+    mv "$temporary_archive" "$archive_path"
+    trap - EXIT
+fi
+
+echo "$SDK_MD5  $archive_path" | md5sum --check --status
+echo "$SDK_SHA256  $archive_path" | sha256sum --check --status
+
+docker build \
+    --target "$profile" \
+    --file "$repository_root/teltonika/Dockerfile" \
+    --build-arg "SDK_BASE_IMAGE=$SDK_BASE_IMAGE" \
+    --build-arg "SDK_ARCHIVE=$SDK_ARCHIVE" \
+    --build-arg "SDK_ROOT=$SDK_DIR" \
+    --build-arg "SDK_VERSION=$SDK_VERSION" \
+    --build-arg "SDK_TARGET=$target" \
+    --build-arg "SDK_NODE_MAJOR=$SDK_NODE_MAJOR" \
+    --build-arg "SDK_PYTHON_VERSION=$SDK_PYTHON_VERSION" \
+    --tag "$image_reference" \
+    "$repository_root"

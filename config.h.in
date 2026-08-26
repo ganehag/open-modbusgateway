@@ -3,8 +3,20 @@
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
+/* Define when Lua automation is enabled */
+#undef HAVE_LUA_AUTOMATION
+
 /* Define to 1 if you have the <minix/config.h> header file. */
 #undef HAVE_MINIX_CONFIG_H
+
+/* Define when modbus_new_rtu accepts a flow-control argument */
+#undef HAVE_MODBUS_RTU_FLOW_CONTROL
+
+/* Define when libmodbus register APIs use uint16_t buffers */
+#undef HAVE_MODBUS_UINT16_REGISTER_BUFFERS
+
+/* Define when libmodbus bit APIs use uint8_t buffers */
+#undef HAVE_MODBUS_UINT8_BIT_BUFFERS
 
 /* Define to 1 if you have the <pthread.h> header file. */
 #undef HAVE_PTHREAD_H

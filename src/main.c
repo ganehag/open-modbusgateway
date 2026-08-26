@@ -182,12 +182,13 @@ main(int argc, char *argv[]) {
     config.port = 1883;
     config.timeout = 10;
     config.reconnect_delay = 5;
+    config.max_inflight_requests = DEFAULT_MAX_INFLIGHT_REQUESTS;
     config.verify_ca_cert = 1; // verify server certificate
     strncpy(config.host, "localhost", sizeof(config.host) - 1);
     strncpy(config.request_topic, "request", sizeof(config.request_topic) - 1);
     strncpy(
         config.response_topic, "response", sizeof(config.response_topic) - 1);
-    strncpy(config.tls_version, "tlsv1.1", sizeof(config.tls_version) - 1);
+    strncpy(config.tls_version, "tlsv1.2", sizeof(config.tls_version) - 1);
     sprintf(config.client_id, "openmmg_client_%d", getpid());
 
     if (configfile == NULL) {
@@ -230,6 +231,7 @@ main(int argc, char *argv[]) {
         flog(logfile, "invalid format of config file (%d)\n", err);
         exit(EXIT_FAILURE);
     }
+    request_set_inflight_limit(config.max_inflight_requests);
 
     if (automation_init(config.automation_script) != 0) {
         flog(logfile, "unable to initialize automation\n");
@@ -341,8 +343,13 @@ main(int argc, char *argv[]) {
             if (run && rc) {
                 flog(logfile, "connection error: %s\n", mosquitto_strerror(rc));
                 automation_emit_mqtt_disconnected(mosquitto_strerror(rc));
-                sleep(10);
-                mosquitto_reconnect(mosq);
+                sleep(config.reconnect_delay);
+                rc = mosquitto_reconnect(mosq);
+                if (rc != MOSQ_ERR_SUCCESS) {
+                    flog(logfile,
+                         "reconnect error: %s\n",
+                         mosquitto_strerror(rc));
+                }
             }
         }
     terminate:;

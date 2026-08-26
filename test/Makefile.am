@@ -1,4 +1,4 @@
-AM_CPPFLAGS = -I$(top_srcdir)/src
+AM_CPPFLAGS = -I$(top_srcdir)/src -I$(top_builddir)
 
 noinst_HEADERS = mqtt_test_helpers.h test.h
 
@@ -16,9 +16,13 @@ openmmg_tests_SOURCES = \
     $(top_srcdir)/src/filters.c \
     $(top_srcdir)/src/iprange.c \
     $(top_srcdir)/src/log.c \
-    $(top_srcdir)/src/mqtt_client.c \
-    $(top_srcdir)/src/automation.c \
-    test_automation.c
+    $(top_srcdir)/src/mqtt_client.c
+
+if BUILD_LUA
+openmmg_tests_SOURCES += $(top_srcdir)/src/automation.c test_automation.c
+else
+openmmg_tests_SOURCES += $(top_srcdir)/src/automation_stub.c test_automation_stub.c
+endif
 
 openmmg_tests_CFLAGS = $(CUNIT_CFLAGS) $(LUA_CFLAGS) $(MODBUS_CFLAGS)
 openmmg_tests_LDADD = $(CUNIT_LIBS) $(LUA_LIBS) $(MODBUS_LIBS)

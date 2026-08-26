@@ -87,6 +87,7 @@ POST_INSTALL = :
 NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
+@BUILD_TESTS_TRUE@am__append_1 = test
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
@@ -153,7 +154,7 @@ am__define_uniq_tagged_files = \
   unique=`for i in $$list; do \
     if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
   done | $(am__uniquify_input)`
-DIST_SUBDIRS = $(SUBDIRS)
+DIST_SUBDIRS = src test
 am__DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/config.h.in \
 	README.md compile depcomp install-sh missing
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -305,9 +306,10 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-SUBDIRS = src test
+SUBDIRS = src $(am__append_1)
 EXTRA_DIST = test/run_serial_gateway_integration.sh test/rtu_slave_sim.c \
-    examples/automation.lua.example
+    examples/automation.lua.example openwrt/Config.in openwrt/Makefile \
+    openwrt/openmmg.config openwrt/openmmg.init
 
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
@@ -789,10 +791,18 @@ uninstall-am:
 .PRECIOUS: Makefile
 
 
-.PHONY: integration-check
+.PHONY: integration-check coverage
 
-integration-check: all
-	$(top_srcdir)/test/run_serial_gateway_integration.sh
+@BUILD_LUA_TRUE@integration-check: all
+@BUILD_LUA_TRUE@	$(top_srcdir)/test/run_serial_gateway_integration.sh
+@BUILD_LUA_FALSE@integration-check:
+@BUILD_LUA_FALSE@	@echo "Lua integration tests require ./configure --enable-lua"
+@BUILD_LUA_FALSE@	@false
+
+coverage:
+	$(MAKE) clean
+	$(MAKE) check CFLAGS='$(CFLAGS) -O0 --coverage'
+	gcovr --root $(top_srcdir) --exclude 'test/' --txt coverage.txt
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
