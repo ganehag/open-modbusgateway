@@ -101,4 +101,5 @@ jobs:
       - name: Attach packages to release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: gh release upload "${{ github.event.release.tag_name }}" dist/*.ipk --clobber
