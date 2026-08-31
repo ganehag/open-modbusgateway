@@ -196,6 +196,22 @@ test_mqtt_rejects_invalid_write_values(void) {
     CU_ASSERT_PTR_NULL(mqtt_test_captured_request());
     CU_ASSERT_PTR_NOT_NULL(
         strstr(mqtt_test_last_payload(), "902 ERROR: INVALID REQUEST"));
+
+    const char *malformed_lists[] = {
+        "1 903 ttyusb0 5 7 16 30 2 1,,2",
+        "1 904 ttyusb0 5 7 16 30 2 ,1,2",
+        "1 905 ttyusb0 5 7 16 30 2 1,2,",
+        "1 906 ttyusb0 5 7 16 30 2 +1,2",
+    };
+    for (size_t i = 0; i < sizeof(malformed_lists) / sizeof(malformed_lists[0]);
+         i++) {
+        mqtt_test_reset();
+        msg = make_message(malformed_lists[i]);
+        mqtt_message_callback(NULL, &config, &msg);
+        CU_ASSERT_PTR_NULL(mqtt_test_captured_request());
+        CU_ASSERT_PTR_NOT_NULL(
+            strstr(mqtt_test_last_payload(), "ERROR: INVALID REQUEST"));
+    }
 }
 
 void
@@ -315,4 +331,80 @@ test_mqtt_parser_malformed_input_smoke(void) {
         free(captured);
         mqtt_test_release_captured_request();
     }
+}
+
+void
+test_mqtt_rejects_binary_or_oversized_payload(void) {
+    silence_logs();
+    mqtt_test_reset();
+
+    config_t config;
+    serial_gateway_t gateway;
+    setup_basic_config(&config, &gateway);
+
+    char binary_payload[] = {'1', ' ', '4', '2', '\0', ' ', 'x'};
+    struct mosquitto_message message = {
+        .payload = binary_payload,
+        .payloadlen = (int)sizeof(binary_payload),
+        .topic = "request",
+    };
+    mqtt_message_callback(NULL, NULL, &message);
+    CU_ASSERT_EQUAL(mqtt_test_publish_count(), 0);
+
+    mqtt_message_callback(NULL, &config, &message);
+    CU_ASSERT_PTR_NULL(mqtt_test_captured_request());
+    CU_ASSERT_PTR_NOT_NULL(
+        strstr(mqtt_test_last_payload(), "0 ERROR: INVALID REQUEST"));
+
+    mqtt_test_reset();
+    char oversized_payload[2049];
+    memset(oversized_payload, '1', sizeof(oversized_payload));
+    message.payload = oversized_payload;
+    message.payloadlen = (int)sizeof(oversized_payload);
+    mqtt_message_callback(NULL, &config, &message);
+    CU_ASSERT_PTR_NULL(mqtt_test_captured_request());
+    CU_ASSERT_PTR_NOT_NULL(
+        strstr(mqtt_test_last_payload(), "0 ERROR: INVALID REQUEST"));
+
+    mqtt_test_reset();
+    const char *retained_payload = "1 999 ttyusb0 5 7 3 1 1";
+    message = make_message(retained_payload);
+    message.retain = true;
+    mqtt_message_callback(NULL, &config, &message);
+    CU_ASSERT_PTR_NULL(mqtt_test_captured_request());
+    CU_ASSERT_PTR_NOT_NULL(
+        strstr(mqtt_test_last_payload(), "0 ERROR: INVALID REQUEST"));
+
+    mqtt_test_reset();
+    mqtt_reply_ok(NULL, "response", 42, 1, NULL, 0, false);
+    CU_ASSERT_EQUAL(mqtt_test_publish_count(), 1);
+    CU_ASSERT_PTR_NOT_NULL(
+        strstr(mqtt_test_last_payload(), "42 ERROR: missing response data"));
+}
+
+void
+test_mqtt_honors_qos_and_retain(void) {
+    silence_logs();
+    mqtt_test_reset();
+
+    config_t config;
+    serial_gateway_t gateway;
+    setup_basic_config(&config, &gateway);
+    config.qos = 2;
+    config.retain = 1;
+    strncpy(config.request_topic, "request", sizeof(config.request_topic) - 1);
+
+    mqtt_connect_callback(NULL, &config, MOSQ_ERR_SUCCESS);
+    CU_ASSERT_EQUAL(mqtt_test_last_subscribe_qos(), 2);
+
+    mqtt_test_set_subscribe_result(MOSQ_ERR_INVAL);
+    mqtt_connect_callback(NULL, &config, MOSQ_ERR_SUCCESS);
+    CU_ASSERT_EQUAL(mqtt_test_disconnect_count(), 1);
+
+    const char *invalid_request = "invalid";
+    struct mosquitto_message message = make_message(invalid_request);
+    mqtt_message_callback(NULL, &config, &message);
+    CU_ASSERT_EQUAL(mqtt_test_publish_count(), 1);
+    CU_ASSERT_EQUAL(mqtt_test_last_qos(), 2);
+    CU_ASSERT_TRUE(mqtt_test_last_retain());
 }

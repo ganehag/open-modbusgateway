@@ -52,8 +52,6 @@ typedef struct {
 typedef struct serial_gateway {
     char id[64];
     char device[128];
-    char ip[INET6_ADDRSTRLEN];
-    uint16_t port;
     int baudrate;
     char parity;
     int data_bits;
@@ -63,8 +61,8 @@ typedef struct serial_gateway {
 } serial_gateway_t;
 
 typedef struct {
-    char ip[INET6_ADDRSTRLEN + 4]; // Ip address, with a CIDR prefix
-    range_u32_t port[MAX_RANGES];  // Port range,
+    char ip[254];                 // CIDR range or exact hostname
+    range_u32_t port[MAX_RANGES]; // Port range,
     uint8_t slave_id; // The max value of a slave id in Modbus is: 247
     uint8_t function; // There are only 17 function codes in Modbus
     char serial_id[64];
@@ -80,7 +78,7 @@ typedef struct {
 // struct to store configuration, i.e. mqtt connection info and filter
 typedef struct {
     // MQTT broker connection info
-    char host[INET6_ADDRSTRLEN]; // ipv4, ipv6 or hostname
+    char host[254]; // ipv4, ipv6 or hostname
     uint16_t port;
     uint16_t keepalive;
 
@@ -122,11 +120,11 @@ uint32_t strto_uint32(const char *str, char **endptr, int base);
 char *strsep_ws(char **str);
 
 // Parse the config file, and call the callback function for each config rule
-int config_parse(char *filename, config_t *config);
+int config_parse(const char *filename, config_t *config);
 int config_parse_file(FILE *file, config_t *config);
 int parse_option_range(char *option_value, range_u32_t *list);
 
-void handle_filter_row(config_t *config, rule_t *rule);
+int handle_filter_row(config_t *config, const rule_t *rule);
 int handle_serial_gateway_row(config_t *config, serial_gateway_t *gateway);
 
 int validate_config(config_t *config);

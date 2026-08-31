@@ -1,6 +1,7 @@
 #ifndef MQTT_TEST_HELPERS_H
 #define MQTT_TEST_HELPERS_H
 
+#include <stdbool.h>
 #include <stddef.h>
 
 #include <mosquitto.h>
@@ -14,6 +15,11 @@ int mqtt_test_publish_count(void);
 const char *mqtt_test_last_topic(void);
 const char *mqtt_test_last_payload(void);
 int mqtt_test_last_rc(void);
+int mqtt_test_last_qos(void);
+bool mqtt_test_last_retain(void);
+int mqtt_test_last_subscribe_qos(void);
+void mqtt_test_set_subscribe_result(int result);
+int mqtt_test_disconnect_count(void);
 
 request_t *mqtt_test_captured_request(void);
 void mqtt_test_release_captured_request(void);

@@ -1,6 +1,7 @@
 #include <stdio.h>
 
 #include "automation.h"
+#include "mqtt_client.h"
 
 int
 automation_init(const char *script_path) {
@@ -77,9 +78,28 @@ void
 automation_queue_modbus_result(const request_t *request,
                                int succeeded,
                                const char *reason) {
-    (void)request;
-    (void)succeeded;
-    (void)reason;
+    if (request == NULL) {
+        return;
+    }
+    if (succeeded) {
+        uint32_t data_length =
+            request->function <= 4 ? request->register_count : 0;
+        mqtt_reply_ok(request->mosq,
+                      request->response_topic,
+                      request->cookie,
+                      data_length,
+                      request->data,
+                      request->response_qos,
+                      request->response_retain);
+    } else {
+        mqtt_reply_error(request->mosq,
+                         request->response_topic,
+                         request->cookie,
+                         MQTT_ERROR_MESSAGE,
+                         reason,
+                         request->response_qos,
+                         request->response_retain);
+    }
 }
 
 int

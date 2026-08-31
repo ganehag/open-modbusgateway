@@ -34,6 +34,9 @@
 // return 0 on success, -1 on failure
 int
 ip_in_range(const char *ip, const iprange_t *iprange) {
+    if (ip == NULL || iprange == NULL) {
+        return -1;
+    }
     struct in6_addr ipaddr;
     if (inet_pton(AF_INET6, ip, &ipaddr) != 1) {
         return -1;
@@ -41,9 +44,9 @@ ip_in_range(const char *ip, const iprange_t *iprange) {
 
     // check if ipaddr is in range of iprange->ipaddr and iprange->netmask
     for (int i = 0; i < 16; i++) {
-        char ipaddr_byte = ipaddr.s6_addr[i];
-        char iprange_ipaddr_byte = iprange->ipaddr.s6_addr[i];
-        char iprange_netmask_byte = iprange->netmask.s6_addr[i];
+        uint8_t ipaddr_byte = ipaddr.s6_addr[i];
+        uint8_t iprange_ipaddr_byte = iprange->ipaddr.s6_addr[i];
+        uint8_t iprange_netmask_byte = iprange->netmask.s6_addr[i];
 
         // if ipaddr_byte is outside the range of iprange_ipaddr_byte and
         // iprange_netmask_byte, return -1
@@ -109,7 +112,7 @@ ip_cidr_to_in6(const char *ip_cidr, iprange_t *range) {
 int
 cidr_to_netmask(const int cidr, struct in6_addr *netmask) {
     // ensure cidr is not invalid
-    if (cidr < 0 || cidr > 128) {
+    if (cidr < 0 || cidr > 128 || netmask == NULL) {
         return -1;
     }
 

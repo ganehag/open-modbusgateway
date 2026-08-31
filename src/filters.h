@@ -1,18 +1,20 @@
 #ifndef FILTERS_H
 #define FILTERS_H
 
-#include <stdint.h>
 #include <netinet/in.h>
+#include <stdint.h>
 
-#include "request.h"
 #include "iprange.h"
+#include "request.h"
 
 typedef struct filter {
     uint8_t applies_tcp;
     uint8_t applies_serial;
     uint8_t has_ip_range;
+    uint8_t has_hostname;
     uint8_t has_port_range;
     iprange_t iprange;
+    char hostname[254];
     char serial_id[64];
 
     // Port to filter
@@ -26,15 +28,14 @@ typedef struct filter {
     uint8_t function_code;
 
     // Register Address to filter
-    uint16_t register_address_min;
-    uint16_t register_address_max;
+    uint32_t register_address_min;
+    uint32_t register_address_max;
 
     // pointer to next filter
     struct filter *next;
 } filter_t;
 
-filter_t *
-filter_new(void);
+filter_t *filter_new(void);
 
 // function to add filter rules to a dynamic array
 void filter_add(filter_t **head, filter_t *filter);
@@ -48,7 +49,5 @@ void filter_print(filter_t *filter);
 // function to check if a message matches the content of request_t
 int filter_match(filter_t *head, request_t *request);
 int filter_match_one(filter_t *filter, request_t *request);
-
-extern filter_t *filters;
 
 #endif // FILTERS_H

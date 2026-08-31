@@ -8,15 +8,20 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../src/mqtt_client.h"
 #include "../src/filters.h"
 #include "../src/log.h"
+#include "../src/mqtt_client.h"
 #include "../src/request.h"
 
 static int publish_count = 0;
 static char last_topic[256];
 static char last_payload[1024];
 static int last_rc = MOSQ_ERR_SUCCESS;
+static int last_qos = -1;
+static bool last_retain = false;
+static int last_subscribe_qos = -1;
+static int subscribe_result = MOSQ_ERR_SUCCESS;
+static int disconnect_count = 0;
 
 static request_t *captured_request = NULL;
 
@@ -30,9 +35,8 @@ mqtt_test_setup_serial_config(config_t *config, serial_gateway_t *gateway) {
     memset(config, 0, sizeof(*config));
     memset(gateway, 0, sizeof(*gateway));
 
-    strncpy(config->response_topic,
-            "response",
-            sizeof(config->response_topic) - 1);
+    strncpy(
+        config->response_topic, "response", sizeof(config->response_topic) - 1);
     config->serial_head = gateway;
     strncpy(gateway->id, "ttyusb0", sizeof(gateway->id) - 1);
     strncpy(gateway->device, "/dev/ttyUSB0", sizeof(gateway->device) - 1);
@@ -106,6 +110,11 @@ mqtt_test_reset(void) {
     memset(last_topic, 0, sizeof(last_topic));
     memset(last_payload, 0, sizeof(last_payload));
     last_rc = MOSQ_ERR_SUCCESS;
+    last_qos = -1;
+    last_retain = false;
+    last_subscribe_qos = -1;
+    subscribe_result = MOSQ_ERR_SUCCESS;
+    disconnect_count = 0;
     captured_request = NULL;
 }
 
@@ -129,6 +138,31 @@ mqtt_test_last_rc(void) {
     return last_rc;
 }
 
+int
+mqtt_test_last_qos(void) {
+    return last_qos;
+}
+
+bool
+mqtt_test_last_retain(void) {
+    return last_retain;
+}
+
+int
+mqtt_test_last_subscribe_qos(void) {
+    return last_subscribe_qos;
+}
+
+void
+mqtt_test_set_subscribe_result(int result) {
+    subscribe_result = result;
+}
+
+int
+mqtt_test_disconnect_count(void) {
+    return disconnect_count;
+}
+
 request_t *
 mqtt_test_captured_request(void) {
     return captured_request;
@@ -147,7 +181,14 @@ mosquitto_subscribe(struct mosquitto *mosq,
     (void)mosq;
     (void)mid;
     (void)sub;
-    (void)qos;
+    last_subscribe_qos = qos;
+    return subscribe_result;
+}
+
+int
+mosquitto_disconnect(struct mosquitto *mosq) {
+    (void)mosq;
+    disconnect_count++;
     return MOSQ_ERR_SUCCESS;
 }
 
@@ -173,8 +214,8 @@ mosquitto_publish(struct mosquitto *mosq,
                   bool retain) {
     (void)mosq;
     (void)mid;
-    (void)qos;
-    (void)retain;
+    last_qos = qos;
+    last_retain = retain;
 
     publish_count++;
     if (topic != NULL) {
@@ -229,13 +270,13 @@ join_regs_str(const uint16_t datalen, const uint16_t *data, const char *sep) {
 
     for (uint16_t i = 0; i < datalen; i++) {
         if (!is_first) {
-            strncpy(joined + sz, sep, lensep);
+            memcpy(joined + sz, sep, lensep);
             sz += lensep;
         }
 
         snprintf(buff, sizeof(buff), "%u", data[i]);
         size_t len = strlen(buff);
-        strncpy(joined + sz, buff, len);
+        memcpy(joined + sz, buff, len);
         sz += len;
         is_first = false;
     }

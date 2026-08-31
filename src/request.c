@@ -216,7 +216,9 @@ request_thread_release(void) {
 int
 request_wait_for_completion(unsigned int timeout_ms) {
     struct timespec deadline;
-    clock_gettime(CLOCK_REALTIME, &deadline);
+    if (clock_gettime(CLOCK_REALTIME, &deadline) != 0) {
+        return -1;
+    }
     deadline.tv_sec += timeout_ms / 1000;
     deadline.tv_nsec += (long)(timeout_ms % 1000) * 1000000L;
     if (deadline.tv_nsec >= 1000000000L) {
@@ -232,6 +234,10 @@ request_wait_for_completion(unsigned int timeout_ms) {
             pthread_mutex_unlock(&request_count_mutex);
             return -1;
         }
+        if (result != 0) {
+            pthread_mutex_unlock(&request_count_mutex);
+            return -1;
+        }
     }
     pthread_mutex_unlock(&request_count_mutex);
     return 0;
@@ -239,6 +245,9 @@ request_wait_for_completion(unsigned int timeout_ms) {
 
 char *
 join_regs_str(const uint16_t datalen, const uint16_t *data, const char *sep) {
+    if (datalen == 0 || data == NULL || sep == NULL) {
+        return NULL;
+    }
     char *joined = NULL;
     size_t lensep = strlen(sep); // separator length
     size_t sz = 0;               // current size
@@ -296,8 +305,14 @@ handle_request(void *arg) {
         goto modbus_cleanup;
     }
 
-    modbus_set_response_timeout(ctx, req->timeout, 0);
-    modbus_set_slave(ctx, req->slave_id);
+    if (modbus_set_response_timeout(ctx, req->timeout, 0) == -1 ||
+        modbus_set_slave(ctx, req->slave_id) == -1) {
+        snprintf(failure_reason,
+                 sizeof(failure_reason),
+                 "%s",
+                 modbus_strerror(errno));
+        goto modbus_cleanup;
+    }
     request_transport_lock(req);
     transport_locked = req->format == 1;
     if (modbus_connect(ctx) == -1) {
@@ -309,45 +324,45 @@ handle_request(void *arg) {
     }
 
     uint8_t coil_data[125];
+    int register_addr = (int)req->register_addr;
     int result = -1;
     switch (req->function) {
     case 1:
         result = modbus_read_bits(
-            ctx, req->register_addr, req->register_count, coil_data);
+            ctx, register_addr, req->register_count, coil_data);
         for (int i = 0; result != -1 && i < req->register_count; i++)
             req->data[i] = coil_data[i];
         break;
     case 2:
         result = modbus_read_input_bits(
-            ctx, req->register_addr, req->register_count, coil_data);
+            ctx, register_addr, req->register_count, coil_data);
         for (int i = 0; result != -1 && i < req->register_count; i++)
             req->data[i] = coil_data[i];
         break;
     case 3:
         result = request_modbus_read_registers(
-            ctx, req->register_addr, req->register_count, req->data);
+            ctx, register_addr, req->register_count, req->data);
         break;
     case 4:
         result = request_modbus_read_input_registers(
-            ctx, req->register_addr, req->register_count, req->data);
+            ctx, register_addr, req->register_count, req->data);
         break;
     case 5:
         result = modbus_write_bit(
-            ctx, req->register_addr, req->register_count > 0 ? TRUE : FALSE);
+            ctx, register_addr, req->register_count > 0 ? TRUE : FALSE);
         break;
     case 6:
-        result =
-            modbus_write_register(ctx, req->register_addr, req->register_count);
+        result = modbus_write_register(ctx, register_addr, req->register_count);
         break;
     case 15:
         for (int i = 0; i < req->register_count; i++)
             coil_data[i] = req->data[i] > 0 ? TRUE : FALSE;
         result = request_modbus_write_bits(
-            ctx, req->register_addr, req->register_count, coil_data);
+            ctx, register_addr, req->register_count, coil_data);
         break;
     case 16:
         result = modbus_write_registers(
-            ctx, req->register_addr, req->register_count, req->data);
+            ctx, register_addr, req->register_count, req->data);
         break;
     default:
         snprintf(
@@ -359,6 +374,14 @@ handle_request(void *arg) {
                  sizeof(failure_reason),
                  "%s",
                  modbus_strerror(errno));
+        goto modbus_cleanup;
+    }
+    int expected_result =
+        req->function == 5 || req->function == 6 ? 1 : req->register_count;
+    if (result != expected_result) {
+        snprintf(failure_reason,
+                 sizeof(failure_reason),
+                 "incomplete Modbus response");
         goto modbus_cleanup;
     }
     succeeded = 1;

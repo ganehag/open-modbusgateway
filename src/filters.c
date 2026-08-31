@@ -18,9 +18,11 @@
  */
 
 #include <arpa/inet.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 #include "filters.h"
 #include "iprange.h"
@@ -43,6 +45,9 @@ filter_new(void) {
 // add_filter function
 void
 filter_add(filter_t **head, filter_t *filter) {
+    if (head == NULL || filter == NULL) {
+        return;
+    }
     filter_t *current = *head;
 
     if (current == NULL) {
@@ -63,6 +68,9 @@ filter_add(filter_t **head, filter_t *filter) {
 // clear filters function
 void
 filter_free(filter_t **head) {
+    if (head == NULL) {
+        return;
+    }
     filter_t *current = *head;
     filter_t *next;
 
@@ -88,6 +96,10 @@ request_fits_register_range(const filter_t *filter, const request_t *request) {
         if (request->register_count == 0) {
             return -1;
         }
+        if ((uint32_t)request->register_count - 1 >
+            UINT32_MAX - request->register_addr) {
+            return -1;
+        }
         end += (uint32_t)request->register_count - 1;
     }
 
@@ -98,8 +110,11 @@ request_fits_register_range(const filter_t *filter, const request_t *request) {
 }
 
 int
-filter_match(filter_t *filters, request_t *request) {
-    filter_t *current = filters;
+filter_match(filter_t *head, request_t *request) {
+    if (request == NULL) {
+        return -1;
+    }
+    filter_t *current = head;
 
     if (current == NULL) {
         return -1;
@@ -135,6 +150,9 @@ filter_match(filter_t *filters, request_t *request) {
 // return 0 on success, -1 on failure
 int
 filter_match_one(filter_t *filter, request_t *request) {
+    if (filter == NULL || request == NULL) {
+        return -1;
+    }
     return filter_match_tcp(filter, request);
 }
 
@@ -158,10 +176,22 @@ filter_match_tcp(filter_t *filter, request_t *request) {
         if (ip_in_range(ip, &filter->iprange) != 0) {
             return -1;
         }
+    } else if (filter->has_hostname) {
+        if (request->ip_type != IP_TYPE_HOSTNAME ||
+            strcasecmp(filter->hostname, request->ip) != 0) {
+            return -1;
+        }
     }
 
     if (filter->has_port_range) {
-        uint16_t port = (uint16_t)atoi(request->port);
+        char *end = NULL;
+        errno = 0;
+        unsigned long parsed_port = strtoul(request->port, &end, 10);
+        if (errno != 0 || end == request->port || *end != '\0' ||
+            parsed_port == 0 || parsed_port > UINT16_MAX) {
+            return -1;
+        }
+        uint16_t port = (uint16_t)parsed_port;
         if (port < filter->port_min || port > filter->port_max) {
             return -1;
         }
@@ -226,12 +256,18 @@ filter_print(filter_t *filter) {
                netmask,
                filter->port_min,
                filter->port_max);
+    } else if (filter->applies_tcp && filter->has_hostname) {
+        printf("%s", filter->hostname);
+        if (filter->has_port_range) {
+            printf(":%d-%d", filter->port_min, filter->port_max);
+        }
+        printf(" ");
     }
     if (filter->applies_serial) {
         printf("serial_id: %s ",
                filter->serial_id[0] != '\0' ? filter->serial_id : "(any)");
     }
-    printf("slave_id: %d, function_code: %d, register_address: %d-%d, "
+    printf("slave_id: %d, function_code: %d, register_address: %u-%u, "
            "is_last: %d\n",
            filter->slave_id,
            filter->function_code,

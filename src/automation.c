@@ -4,6 +4,7 @@
 
 #include <errno.h>
 #include <lauxlib.h>
+#include <limits.h>
 #include <lua.h>
 #include <lualib.h>
 #include <modbus/modbus.h>
@@ -23,8 +24,8 @@
 #define AUTOMATION_INSTRUCTION_LIMIT 100000
 #define AUTOMATION_MEMORY_LIMIT (1024U * 1024U)
 #define AUTOMATION_HOOK_INTERVAL 1000
-#define AUTOMATION_QUEUE_CAPACITY 64
 #define AUTOMATION_TARGET_CAPACITY 64
+#define AUTOMATION_MAX_PENDING_RESULTS 1024
 
 static lua_State *automation_state;
 static int instruction_budget;
@@ -42,18 +43,16 @@ typedef struct {
 static automation_target_t targets[AUTOMATION_TARGET_CAPACITY];
 static unsigned int next_target_id = 1;
 
-typedef struct {
-    const char *handler;
-    const char *name;
+typedef struct automation_event {
     char reason[128];
-    int error;
     int succeeded;
     request_t request;
+    struct automation_event *next;
 } automation_event_t;
 
-static automation_event_t event_queue[AUTOMATION_QUEUE_CAPACITY];
-static size_t event_queue_head;
-static size_t event_queue_tail;
+static automation_event_t *event_queue_head;
+static automation_event_t *event_queue_tail;
+static size_t event_queue_count;
 static pthread_mutex_t event_queue_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 #if LUA_VERSION_NUM < 502
@@ -90,20 +89,71 @@ automation_lua_alloc(void *userdata,
                      size_t old_size,
                      size_t new_size) {
     size_t *used = userdata;
+    size_t previous_size = pointer != NULL ? old_size : 0;
     if (new_size == 0) {
         free(pointer);
-        *used -= old_size;
+        *used = previous_size <= *used ? *used - previous_size : 0;
         return NULL;
     }
-    if (new_size > old_size &&
-        new_size - old_size > AUTOMATION_MEMORY_LIMIT - *used) {
+    if (*used > AUTOMATION_MEMORY_LIMIT ||
+        (new_size > previous_size &&
+         new_size - previous_size > AUTOMATION_MEMORY_LIMIT - *used)) {
         return NULL;
     }
     void *result = realloc(pointer, new_size);
     if (result != NULL) {
-        *used = *used - old_size + new_size;
+        *used = *used - previous_size + new_size;
     }
     return result;
+}
+
+static void
+automation_clear_event_queue(void) {
+    pthread_mutex_lock(&event_queue_mutex);
+    automation_event_t *event = event_queue_head;
+    event_queue_head = NULL;
+    event_queue_tail = NULL;
+    event_queue_count = 0;
+    pthread_mutex_unlock(&event_queue_mutex);
+
+    while (event != NULL) {
+        automation_event_t *next = event->next;
+        free(event);
+        event = next;
+    }
+}
+
+static int
+automation_get_integer(lua_State *state,
+                       int index,
+                       lua_Integer minimum,
+                       lua_Integer maximum,
+                       lua_Integer *value) {
+    lua_Integer parsed;
+#if LUA_VERSION_NUM >= 503
+    if (!lua_isinteger(state, index)) {
+        return -1;
+    }
+    parsed = lua_tointeger(state, index);
+#else
+    if (lua_type(state, index) != LUA_TNUMBER) {
+        return -1;
+    }
+    lua_Number number = lua_tonumber(state, index);
+    if (number != number || number < (lua_Number)minimum ||
+        number > (lua_Number)maximum) {
+        return -1;
+    }
+    parsed = lua_tointeger(state, index);
+    if ((lua_Number)parsed != number) {
+        return -1;
+    }
+#endif
+    if (parsed < minimum || parsed > maximum) {
+        return -1;
+    }
+    *value = parsed;
+    return 0;
 }
 
 static unsigned int
@@ -269,9 +319,9 @@ automation_push_request(lua_State *state, const request_t *request) {
 static int
 automation_request_from_table(lua_State *state, int index, request_t *request) {
     lua_getfield(state, index, "address");
-    if (lua_isnumber(state, -1)) {
-        lua_Integer address = lua_tointeger(state, -1);
-        if (address < 1 || address > 65536) {
+    if (!lua_isnil(state, -1)) {
+        lua_Integer address;
+        if (automation_get_integer(state, -1, 1, 65536, &address) != 0) {
             lua_pop(state, 1);
             return -1;
         }
@@ -280,13 +330,13 @@ automation_request_from_table(lua_State *state, int index, request_t *request) {
     lua_pop(state, 1);
 
     lua_getfield(state, index, "count");
-    if (lua_isnumber(state, -1)) {
-        lua_Integer count = lua_tointeger(state, -1);
+    if (!lua_isnil(state, -1)) {
         lua_Integer max_count = request->function == 6 ? UINT16_MAX : 123;
         if (request->function >= 1 && request->function <= 4) {
             max_count = 125;
         }
-        if (count < 0 || count > max_count) {
+        lua_Integer count;
+        if (automation_get_integer(state, -1, 0, max_count, &count) != 0) {
             lua_pop(state, 1);
             return -1;
         }
@@ -295,30 +345,31 @@ automation_request_from_table(lua_State *state, int index, request_t *request) {
     lua_pop(state, 1);
 
     lua_getfield(state, index, "values");
-    if (lua_istable(state, -1)) {
-        size_t count = lua_rawlen(state, -1);
-        size_t max_values = request->function <= 4 ? 125 : 123;
-        if (count > max_values ||
-            ((request->function == 5 || request->function == 6) &&
-             count != 0)) {
-            lua_pop(state, 1);
+    if (!lua_istable(state, -1)) {
+        lua_pop(state, 1);
+        return -1;
+    }
+    size_t count = lua_rawlen(state, -1);
+    size_t max_values = request->function <= 4 ? 125 : 123;
+    if (count > max_values ||
+        ((request->function == 5 || request->function == 6) && count != 0) ||
+        ((request->function == 15 || request->function == 16) &&
+         count != request->register_count)) {
+        lua_pop(state, 1);
+        return -1;
+    }
+    for (size_t i = 0; i < count; i++) {
+        lua_rawgeti(state, -1, (int)i + 1);
+        lua_Integer value;
+        if (automation_get_integer(state, -1, 0, UINT16_MAX, &value) != 0 ||
+            ((request->function == 1 || request->function == 2 ||
+              request->function == 15) &&
+             value > 1)) {
+            lua_pop(state, 2);
             return -1;
         }
-        for (size_t i = 0; i < count; i++) {
-            lua_rawgeti(state, -1, (int)i + 1);
-            if (!lua_isnumber(state, -1)) {
-                lua_pop(state, 2);
-                return -1;
-            }
-            lua_Integer value = lua_tointeger(state, -1);
-            lua_pop(state, 1);
-            if (value < 0 || value > UINT16_MAX ||
-                (request->function == 15 && value > 1)) {
-                lua_pop(state, 1);
-                return -1;
-            }
-            request->data[i] = (uint16_t)value;
-        }
+        lua_pop(state, 1);
+        request->data[i] = (uint16_t)value;
     }
     lua_pop(state, 1);
     return 0;
@@ -478,8 +529,11 @@ automation_open_modbus(request_t *request) {
     if (ctx == NULL) {
         return NULL;
     }
-    modbus_set_response_timeout(ctx, request->timeout, 0);
-    modbus_set_slave(ctx, request->slave_id);
+    if (modbus_set_response_timeout(ctx, request->timeout, 0) == -1 ||
+        modbus_set_slave(ctx, request->slave_id) == -1) {
+        modbus_free(ctx);
+        return NULL;
+    }
     request_transport_lock(request);
     if (modbus_connect(ctx) == -1) {
         modbus_free(ctx);
@@ -520,8 +574,9 @@ lua_gateway_read_registers(lua_State *state) {
     uint16_t values[125];
     int result = automation_modbus_read_registers(
         ctx, request.register_addr, request.register_count, values);
-    if (result == -1) {
-        const char *message = modbus_strerror(errno);
+    if (result != request.register_count) {
+        const char *message = result == -1 ? modbus_strerror(errno)
+                                           : "incomplete Modbus response";
         automation_close_modbus(&request, ctx);
         lua_pushnil(state);
         lua_pushstring(state, message);
@@ -552,14 +607,11 @@ lua_gateway_write_registers(lua_State *state) {
     request.register_count = (uint16_t)count;
     for (size_t i = 0; i < count; i++) {
         lua_rawgeti(state, 2, (int)i + 1);
-        if (!lua_isnumber(state, -1)) {
+        lua_Integer value;
+        if (automation_get_integer(state, -1, 0, UINT16_MAX, &value) != 0) {
             return luaL_error(state, "write values must be integers");
         }
-        lua_Integer value = lua_tointeger(state, -1);
         lua_pop(state, 1);
-        if (value < 0 || value > UINT16_MAX) {
-            return luaL_error(state, "write value is out of range");
-        }
         request.data[i] = (uint16_t)value;
     }
 
@@ -572,8 +624,9 @@ lua_gateway_write_registers(lua_State *state) {
     }
     int result = modbus_write_registers(
         ctx, request.register_addr, request.register_count, request.data);
-    if (result == -1) {
-        const char *message = modbus_strerror(errno);
+    if (result != request.register_count) {
+        const char *message = result == -1 ? modbus_strerror(errno)
+                                           : "incomplete Modbus response";
         automation_close_modbus(&request, ctx);
         lua_pushnil(state);
         lua_pushstring(state, message);
@@ -592,7 +645,12 @@ automation_request_from_target(lua_State *state,
         return -1;
     }
     lua_getfield(state, index, "id");
-    unsigned int id = (unsigned int)lua_tointeger(state, -1);
+    lua_Integer parsed_id;
+    if (automation_get_integer(state, -1, 1, UINT_MAX, &parsed_id) != 0) {
+        lua_pop(state, 1);
+        return -1;
+    }
+    unsigned int id = (unsigned int)parsed_id;
     lua_pop(state, 1);
     for (size_t i = 0; i < AUTOMATION_TARGET_CAPACITY; i++) {
         if (targets[i].id == id) {
@@ -624,14 +682,11 @@ lua_gateway_write_registers_to(lua_State *state) {
     request.register_count = (uint16_t)count;
     for (size_t i = 0; i < count; i++) {
         lua_rawgeti(state, 3, (int)i + 1);
-        if (!lua_isnumber(state, -1)) {
+        lua_Integer value;
+        if (automation_get_integer(state, -1, 0, UINT16_MAX, &value) != 0) {
             return luaL_error(state, "write values must be integers");
         }
-        lua_Integer value = lua_tointeger(state, -1);
         lua_pop(state, 1);
-        if (value < 0 || value > UINT16_MAX) {
-            return luaL_error(state, "write value is out of range");
-        }
         request.data[i] = (uint16_t)value;
     }
 
@@ -644,8 +699,9 @@ lua_gateway_write_registers_to(lua_State *state) {
     }
     int result = modbus_write_registers(
         ctx, request.register_addr, request.register_count, request.data);
-    if (result == -1) {
-        const char *message = modbus_strerror(errno);
+    if (result != request.register_count) {
+        const char *message = result == -1 ? modbus_strerror(errno)
+                                           : "incomplete Modbus response";
         automation_close_modbus(&request, ctx);
         lua_pushnil(state);
         lua_pushstring(state, message);
@@ -690,6 +746,11 @@ automation_intercept_request(const config_t *config,
 
 int
 automation_init(const char *script_path) {
+    automation_shutdown();
+    last_timer_ms = 0;
+    memset(targets, 0, sizeof(targets));
+    next_target_id = 1;
+
     if (script_path == NULL || script_path[0] == '\0') {
         return 0;
     }
@@ -700,14 +761,6 @@ automation_init(const char *script_path) {
     if (automation_state == NULL) {
         return -1;
     }
-    pthread_mutex_lock(&event_queue_mutex);
-    event_queue_head = 0;
-    event_queue_tail = 0;
-    pthread_mutex_unlock(&event_queue_mutex);
-    last_timer_ms = 0;
-    memset(targets, 0, sizeof(targets));
-    next_target_id = 1;
-
     automation_lua_requiref(automation_state, "_G", luaopen_base, 1);
     lua_pop(automation_state, 1);
     automation_lua_requiref(automation_state, "string", luaopen_string, 1);
@@ -755,6 +808,7 @@ automation_shutdown(void) {
     }
     automation_memory_used = 0;
     automation_config = NULL;
+    automation_clear_event_queue();
 }
 
 int
@@ -800,22 +854,49 @@ void
 automation_queue_modbus_result(const request_t *request,
                                int succeeded,
                                const char *reason) {
-    pthread_mutex_lock(&event_queue_mutex);
-    size_t next = (event_queue_tail + 1) % AUTOMATION_QUEUE_CAPACITY;
-    if (next == event_queue_head) {
-        flog(logfile, "automation event queue full; dropping Modbus result\n");
-        pthread_mutex_unlock(&event_queue_mutex);
+    if (request == NULL) {
+        return;
+    }
+    automation_event_t *event = calloc(1, sizeof(*event));
+    if (event == NULL) {
+        flog(logfile, "unable to queue Modbus result\n");
+        mqtt_reply_error(request->mosq,
+                         request->response_topic,
+                         request->cookie,
+                         MQTT_ERROR_MESSAGE,
+                         "unable to queue Modbus result",
+                         request->response_qos,
+                         request->response_retain);
         return;
     }
 
-    automation_event_t *event = &event_queue[event_queue_tail];
-    memset(event, 0, sizeof(*event));
     event->succeeded = succeeded;
     event->request = *request;
     if (reason != NULL) {
         strncpy(event->reason, reason, sizeof(event->reason) - 1);
     }
-    event_queue_tail = next;
+
+    pthread_mutex_lock(&event_queue_mutex);
+    if (event_queue_count >= AUTOMATION_MAX_PENDING_RESULTS) {
+        pthread_mutex_unlock(&event_queue_mutex);
+        free(event);
+        flog(logfile, "automation event queue full\n");
+        mqtt_reply_error(request->mosq,
+                         request->response_topic,
+                         request->cookie,
+                         MQTT_ERROR_MESSAGE,
+                         "automation event queue full",
+                         request->response_qos,
+                         request->response_retain);
+        return;
+    }
+    if (event_queue_tail == NULL) {
+        event_queue_head = event;
+    } else {
+        event_queue_tail->next = event;
+    }
+    event_queue_tail = event;
+    event_queue_count++;
     pthread_mutex_unlock(&event_queue_mutex);
 }
 
@@ -847,11 +928,11 @@ automation_transform_response(request_t *request) {
     if (automation_state == NULL) {
         return 0;
     }
-    uint32_t address = request->register_addr;
-    uint16_t count = request->register_count;
-    int result = automation_emit_after_request(request);
-    request->register_addr = address;
-    request->register_count = count;
+    request_t transformed = *request;
+    int result = automation_emit_after_request(&transformed);
+    if (result == 0) {
+        memcpy(request->data, transformed.data, sizeof(request->data));
+    }
     return result;
 }
 
@@ -859,48 +940,67 @@ int
 automation_dispatch_pending(void) {
     int result = 0;
     for (;;) {
-        automation_event_t event;
         pthread_mutex_lock(&event_queue_mutex);
-        if (event_queue_head == event_queue_tail) {
+        automation_event_t *event = event_queue_head;
+        if (event == NULL) {
             pthread_mutex_unlock(&event_queue_mutex);
             return result;
         }
-        event = event_queue[event_queue_head];
-        event_queue_head = (event_queue_head + 1) % AUTOMATION_QUEUE_CAPACITY;
+        event_queue_head = event->next;
+        if (event_queue_head == NULL) {
+            event_queue_tail = NULL;
+        }
+        event_queue_count--;
         pthread_mutex_unlock(&event_queue_mutex);
 
-        if (event.succeeded) {
-            if (automation_transform_response(&event.request) != 0) {
+        if (event->succeeded) {
+            int transform_result =
+                automation_transform_response(&event->request);
+            if (transform_result != 0) {
                 result = -1;
+                mqtt_reply_error(event->request.mosq,
+                                 event->request.response_topic,
+                                 event->request.cookie,
+                                 MQTT_ERROR_MESSAGE,
+                                 "response automation failed",
+                                 event->request.response_qos,
+                                 event->request.response_retain);
+            } else {
+                uint32_t data_len = event->request.function <= 4
+                                        ? event->request.register_count
+                                        : 0;
+                mqtt_reply_ok(event->request.mosq,
+                              event->request.response_topic,
+                              event->request.cookie,
+                              data_len,
+                              event->request.data,
+                              event->request.response_qos,
+                              event->request.response_retain);
             }
-            uint32_t data_len =
-                event.request.function <= 4 ? event.request.register_count : 0;
-            mqtt_reply_ok(event.request.mosq,
-                          event.request.response_topic,
-                          event.request.cookie,
-                          data_len,
-                          event.request.data);
             if (automation_emit("on_modbus_succeeded",
                                 "modbus_succeeded",
                                 NULL,
-                                &event.request,
+                                &event->request,
                                 0) != 0) {
                 result = -1;
             }
         } else {
-            mqtt_reply_error(event.request.mosq,
-                             event.request.response_topic,
-                             event.request.cookie,
+            mqtt_reply_error(event->request.mosq,
+                             event->request.response_topic,
+                             event->request.cookie,
                              MQTT_ERROR_MESSAGE,
-                             event.reason[0] != '\0' ? event.reason : NULL);
+                             event->reason[0] != '\0' ? event->reason : NULL,
+                             event->request.response_qos,
+                             event->request.response_retain);
             if (automation_emit("on_modbus_failed",
                                 "modbus_failed",
-                                event.reason[0] != '\0' ? event.reason : NULL,
-                                &event.request,
+                                event->reason[0] != '\0' ? event->reason : NULL,
+                                &event->request,
                                 0) != 0) {
                 result = -1;
             }
         }
+        free(event);
     }
 }
 
@@ -913,4 +1013,3 @@ automation_emit_timer(void) {
     last_timer_ms = now;
     return automation_emit("on_timer", "timer", NULL, NULL, 0);
 }
-int result = 0;

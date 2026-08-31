@@ -33,6 +33,11 @@ void test_validate_config_tls_options(void);
 void test_config_rejects_legacy_tls(void);
 void test_config_parses_request_limit(void);
 void test_config_rejects_unknown_or_malformed_options(void);
+void test_config_rejects_oversized_values_and_ranges(void);
+void test_config_rejects_invalid_or_incomplete_rules(void);
+void test_config_allows_adjacent_sections(void);
+void test_config_preserves_hashes_and_rejects_bad_quotes(void);
+void test_hostname_validation_and_storage(void);
 void test_config_parser_malformed_input_smoke(void);
 
 void test_trim_functions(void);
@@ -48,14 +53,19 @@ void test_mqtt_accepts_non_terminated_payload(void);
 void test_mqtt_rejects_invalid_tcp_address(void);
 void test_mqtt_rejects_malformed_numeric_fields(void);
 void test_mqtt_parser_malformed_input_smoke(void);
+void test_mqtt_rejects_binary_or_oversized_payload(void);
+void test_mqtt_honors_qos_and_retain(void);
 
 #ifdef HAVE_LUA_AUTOMATION
 void test_automation_callbacks(void);
 void test_automation_instruction_limit(void);
 void test_automation_memory_limit(void);
 void test_automation_request_hooks(void);
+void test_automation_result_queue_growth(void);
+void test_automation_rejects_invalid_edits_and_reinitializes(void);
 #else
 void test_automation_disabled(void);
+void test_automation_disabled_delivers_results(void);
 #endif
 
 #endif

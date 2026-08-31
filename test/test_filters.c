@@ -15,6 +15,7 @@ test_filter_add(void) {
     for (int i = 0; i < 20; i++) {
         // allocate the new filter
         filter_t *new_filter = calloc(1, sizeof(filter_t));
+        CU_ASSERT_PTR_NOT_NULL_FATAL(new_filter);
         new_filter->next = NULL;
 
         // assign values to the filter
@@ -50,6 +51,7 @@ test_filter_add(void) {
 void
 test_filter_match(void) {
     filter_t *filter = calloc(1, sizeof(filter_t));
+    CU_ASSERT_PTR_NOT_NULL_FATAL(filter);
 
     CU_ASSERT_EQUAL(ip_cidr_to_in6("::ffff:192.168.1.1/120", &filter->iprange),
                     0);
@@ -139,6 +141,10 @@ test_filter_match_without_filters(void) {
     request.register_count = 1;
 
     CU_ASSERT_EQUAL(filter_match(NULL, &request), -1);
+    CU_ASSERT_EQUAL(filter_match(NULL, NULL), -1);
+    CU_ASSERT_EQUAL(filter_match_one(NULL, &request), -1);
+    filter_add(NULL, NULL);
+    filter_free(NULL);
 }
 
 void
@@ -167,6 +173,10 @@ test_filter_match_rejects_range_overrun(void) {
     request.register_count = 1;
     CU_ASSERT_EQUAL(filter_match(filter, &request), 0);
 
+    request.register_addr = UINT32_MAX;
+    request.register_count = 2;
+    CU_ASSERT_EQUAL(filter_match(filter, &request), -1);
+
     filter_free(&filter);
 }
 
@@ -175,6 +185,7 @@ test_filter_match_serial(void) {
     filter_t *filters_head = NULL;
 
     filter_t *serial_filter = calloc(1, sizeof(filter_t));
+    CU_ASSERT_PTR_NOT_NULL_FATAL(serial_filter);
     serial_filter->applies_serial = 1;
     strncpy(serial_filter->serial_id,
             "ttyusb0",
@@ -214,6 +225,7 @@ test_multiple_filters_match(void) {
 
     // allocate the new filter
     filter_t *filter1 = calloc(1, sizeof(filter_t));
+    CU_ASSERT_PTR_NOT_NULL_FATAL(filter1);
     filter1->next = NULL;
 
     // assign values to the filter
@@ -234,6 +246,7 @@ test_multiple_filters_match(void) {
 
     // allocate the new filter
     filter_t *filter2 = calloc(1, sizeof(filter_t));
+    CU_ASSERT_PTR_NOT_NULL_FATAL(filter2);
     filter2->next = NULL;
 
     // assign values to the filter
@@ -254,6 +267,7 @@ test_multiple_filters_match(void) {
 
     // allocate the new filter
     filter_t *filter3 = calloc(1, sizeof(filter_t));
+    CU_ASSERT_PTR_NOT_NULL_FATAL(filter3);
     filter3->next = NULL;
 
     // assign values to the filter

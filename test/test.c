@@ -1,9 +1,10 @@
 #include "config.h"
 
+#include "../src/log.h"
 #include "test.h"
 
 int
-main() {
+main(void) {
     // Initialize the CUnit test registry
     if (CUE_SUCCESS != CU_initialize_registry()) {
         return CU_get_error();
@@ -69,6 +70,21 @@ main() {
                 "test_config_rejects_unknown_or_malformed_options",
                 test_config_rejects_unknown_or_malformed_options);
     CU_add_test(suite3,
+                "test_config_rejects_oversized_values_and_ranges",
+                test_config_rejects_oversized_values_and_ranges);
+    CU_add_test(suite3,
+                "test_config_rejects_invalid_or_incomplete_rules",
+                test_config_rejects_invalid_or_incomplete_rules);
+    CU_add_test(suite3,
+                "test_config_allows_adjacent_sections",
+                test_config_allows_adjacent_sections);
+    CU_add_test(suite3,
+                "test_config_preserves_hashes_and_rejects_bad_quotes",
+                test_config_preserves_hashes_and_rejects_bad_quotes);
+    CU_add_test(suite3,
+                "test_hostname_validation_and_storage",
+                test_hostname_validation_and_storage);
+    CU_add_test(suite3,
                 "test_config_parser_malformed_input_smoke",
                 test_config_parser_malformed_input_smoke);
 
@@ -108,6 +124,12 @@ main() {
     CU_add_test(suite5,
                 "test_mqtt_parser_malformed_input_smoke",
                 test_mqtt_parser_malformed_input_smoke);
+    CU_add_test(suite5,
+                "test_mqtt_rejects_binary_or_oversized_payload",
+                test_mqtt_rejects_binary_or_oversized_payload);
+    CU_add_test(suite5,
+                "test_mqtt_honors_qos_and_retain",
+                test_mqtt_honors_qos_and_retain);
 
 #ifdef HAVE_LUA_AUTOMATION
     CU_pSuite suite6 = CU_add_suite("Automation", NULL, NULL);
@@ -119,15 +141,25 @@ main() {
         suite6, "test_automation_memory_limit", test_automation_memory_limit);
     CU_add_test(
         suite6, "test_automation_request_hooks", test_automation_request_hooks);
+    CU_add_test(suite6,
+                "test_automation_result_queue_growth",
+                test_automation_result_queue_growth);
+    CU_add_test(suite6,
+                "test_automation_rejects_invalid_edits_and_reinitializes",
+                test_automation_rejects_invalid_edits_and_reinitializes);
 #else
     CU_pSuite suite6 = CU_add_suite("Automation disabled", NULL, NULL);
     CU_add_test(suite6, "test_automation_disabled", test_automation_disabled);
+    CU_add_test(suite6,
+                "test_automation_disabled_delivers_results",
+                test_automation_disabled_delivers_results);
 #endif
 
     CU_basic_set_mode(CU_BRM_VERBOSE);
     CU_basic_run_tests();
     unsigned int failures = CU_get_number_of_failures();
     CU_cleanup_registry();
+    close_logfile();
 
     return failures == 0 ? 0 : 1;
 }

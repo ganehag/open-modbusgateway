@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMPDIR="$(mktemp -d -t openmmg-integration-XXXXXX)"
 
-CLEANUP_CMDS=()
+CLEANUP_PIDS=()
 
 if [[ ! -x "$ROOT_DIR/src/openmmg" ]]; then
     echo "[INFO] Building openmmg binary"
@@ -15,10 +15,10 @@ if [[ ! -x "$ROOT_DIR/src/openmmg" ]]; then
 fi
 
 cleanup() {
-    for cmd in "${CLEANUP_CMDS[@]}"; do
-        eval "$cmd"
+    for pid in "${CLEANUP_PIDS[@]}"; do
+        kill "$pid" >/dev/null 2>&1 || true
     done
-    rm -rf "$TMPDIR"
+    rm -rf -- "$TMPDIR"
 }
 trap cleanup EXIT
 
@@ -32,7 +32,7 @@ echo "[INFO] Creating virtual serial link with socat"
 socat -d -d PTY,raw,echo=0,link="$MASTER_DEV" PTY,raw,echo=0,link="$SLAVE_DEV" \
     &> "$TMPDIR/socat.log" &
 SOCAT_PID=$!
-CLEANUP_CMDS+=("kill $SOCAT_PID >/dev/null 2>&1 || true")
+CLEANUP_PIDS+=("$SOCAT_PID")
 sleep 1
 
 echo "[INFO] Building RTU slave simulator"
@@ -42,14 +42,7 @@ echo "[INFO] Starting RTU slave simulator on $SLAVE_DEV"
 "$TMPDIR/rtu_slave_sim" "$SLAVE_DEV" 115200 E 8 1 3 100 \
     &> "$TMPDIR/rtu_slave.log" &
 SLAVE_PID=$!
-CLEANUP_CMDS+=("kill $SLAVE_PID >/dev/null 2>&1 || true")
-sleep 1
-
-echo "[INFO] Launching mosquitto broker on port $PORT"
-/usr/sbin/mosquitto -p "$PORT" -v \
-    &> "$TMPDIR/mosquitto.log" &
-MOSQUITTO_PID=$!
-CLEANUP_CMDS+=("kill $MOSQUITTO_PID >/dev/null 2>&1 || true")
+CLEANUP_PIDS+=("$SLAVE_PID")
 sleep 1
 
 CONF_FILE="$TMPDIR/openmmg.conf"
@@ -79,6 +72,7 @@ cat > "$CONF_FILE" <<EOF
 config mqtt
     option host '127.0.0.1'
     option port '$PORT'
+    option reconnect_delay '1'
     option request_topic 'request'
     option response_topic 'response'
 
@@ -111,7 +105,20 @@ echo "[INFO] Starting openmmg with config $CONF_FILE"
 "$ROOT_DIR/src/openmmg" -c "$CONF_FILE" -d \
     &> "$TMPDIR/openmmg.log" &
 OPENMMG_PID=$!
-CLEANUP_CMDS+=("kill $OPENMMG_PID >/dev/null 2>&1 || true")
+CLEANUP_PIDS+=("$OPENMMG_PID")
+sleep 1
+
+if ! kill -0 "$OPENMMG_PID" 2>/dev/null; then
+    echo "[ERROR] openmmg exited while the broker was unavailable."
+    cat "$TMPDIR/openmmg.log"
+    exit 1
+fi
+
+echo "[INFO] Launching mosquitto broker on port $PORT"
+/usr/sbin/mosquitto -p "$PORT" -v \
+    &> "$TMPDIR/mosquitto.log" &
+MOSQUITTO_PID=$!
+CLEANUP_PIDS+=("$MOSQUITTO_PID")
 sleep 2
 
 RESPONSE_FILE="$TMPDIR/response.txt"
@@ -119,7 +126,7 @@ echo "[INFO] Subscribing to MQTT response topic"
 timeout 20 mosquitto_sub -h 127.0.0.1 -p "$PORT" -t response -C 1 \
     > "$RESPONSE_FILE" &
 SUB_PID=$!
-CLEANUP_CMDS+=("kill $SUB_PID >/dev/null 2>&1 || true")
+CLEANUP_PIDS+=("$SUB_PID")
 sleep 2
 
 REQUEST="1 $COOKIE $SERIAL_ID 5 3 3 1 2"
@@ -158,7 +165,7 @@ echo "[INFO] Verifying concurrent RTU requests are serialized"
 timeout 20 mosquitto_sub -h 127.0.0.1 -p "$PORT" -t response -C 4 \
     > "$CONCURRENT_RESPONSE_FILE" &
 CONCURRENT_SUB_PID=$!
-CLEANUP_CMDS+=("kill $CONCURRENT_SUB_PID >/dev/null 2>&1 || true")
+CLEANUP_PIDS+=("$CONCURRENT_SUB_PID")
 sleep 1
 CONCURRENT_PUBLISH_PIDS=()
 for CONCURRENT_COOKIE in 123456793 123456794 123456795 123456796; do
@@ -187,7 +194,7 @@ RESET_WRITE_FILE="$TMPDIR/reset_write.txt"
 timeout 20 mosquitto_sub -h 127.0.0.1 -p "$PORT" -t response -C 1 \
     > "$RESET_WRITE_FILE" &
 RESET_WRITE_SUB_PID=$!
-CLEANUP_CMDS+=("kill $RESET_WRITE_SUB_PID >/dev/null 2>&1 || true")
+CLEANUP_PIDS+=("$RESET_WRITE_SUB_PID")
 sleep 1
 echo "[INFO] Verifying automation resets an inactive register"
 mosquitto_pub -h 127.0.0.1 -p "$PORT" -t request \
@@ -200,7 +207,7 @@ RESET_READ_FILE="$TMPDIR/reset_read.txt"
 timeout 20 mosquitto_sub -h 127.0.0.1 -p "$PORT" -t response -C 1 \
     > "$RESET_READ_FILE" &
 RESET_READ_SUB_PID=$!
-CLEANUP_CMDS+=("kill $RESET_READ_SUB_PID >/dev/null 2>&1 || true")
+CLEANUP_PIDS+=("$RESET_READ_SUB_PID")
 sleep 1
 mosquitto_pub -h 127.0.0.1 -p "$PORT" -t request \
     -m "1 $RESET_READ_COOKIE $SERIAL_ID 5 3 3 1 1"
@@ -218,7 +225,7 @@ echo "[INFO] Verifying serial filter blocks an out-of-range request"
 timeout 20 mosquitto_sub -h 127.0.0.1 -p "$PORT" -t response -C 1 \
     > "$BLOCKED_RESPONSE_FILE" &
 BLOCKED_SUB_PID=$!
-CLEANUP_CMDS+=("kill $BLOCKED_SUB_PID >/dev/null 2>&1 || true")
+CLEANUP_PIDS+=("$BLOCKED_SUB_PID")
 sleep 1
 
 BLOCKED_REQUEST="1 $BLOCKED_COOKIE $SERIAL_ID 5 3 3 11 1"
@@ -238,3 +245,15 @@ if [[ "$BLOCKED_RESPONSE" != "$EXPECTED_BLOCKED_RESPONSE" ]]; then
 fi
 
 echo "[INFO] Serial filter integration test passed: $BLOCKED_RESPONSE"
+
+echo "[INFO] Verifying graceful shutdown while the broker is unavailable"
+kill "$MOSQUITTO_PID"
+wait "$MOSQUITTO_PID" || true
+sleep 2
+kill -TERM "$OPENMMG_PID"
+if ! wait "$OPENMMG_PID"; then
+    echo "[ERROR] openmmg reported failure during graceful shutdown."
+    cat "$TMPDIR/openmmg.log"
+    exit 1
+fi
+echo "[INFO] Graceful disconnected shutdown test passed"

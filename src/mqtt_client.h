@@ -2,6 +2,7 @@
 #define MQTT_CLIENT_H
 
 #include <mosquitto.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 #define MQTT_INVALID_REQUEST 1
@@ -12,13 +13,17 @@ void mqtt_reply_error(struct mosquitto *mosq,
                       const char *topic,
                       unsigned long long int cookie,
                       int error,
-                      const char *str_msg);
+                      const char *str_msg,
+                      int qos,
+                      bool retain);
 void mqtt_reply_ok(struct mosquitto *mosq,
                    const char *topic,
                    unsigned long long int cookie,
                    uint32_t datalen,
-                   uint16_t *data);
-void mqtt_stderr_log(int rc);
+                   const uint16_t *data,
+                   int qos,
+                   bool retain);
+void mqtt_logfile_log(int rc);
 void mqtt_connect_callback(struct mosquitto *mosq, void *obj, int result);
 void mqtt_message_callback(struct mosquitto *mosq,
                            void *obj,

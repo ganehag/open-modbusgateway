@@ -9,6 +9,7 @@
 
 #include "../src/automation.h"
 #include "../src/log.h"
+#include "mqtt_test_helpers.h"
 #include "test.h"
 
 static char *
@@ -135,6 +136,119 @@ test_automation_request_hooks(void) {
         automation_intercept_request(&config, &request, reason, sizeof(reason)),
         1);
     CU_ASSERT_STRING_EQUAL(reason, "writes are disabled");
+    automation_shutdown();
+    unlink(path);
+    free(path);
+}
+
+void
+test_automation_result_queue_growth(void) {
+    mqtt_test_silence_logs();
+    mqtt_test_reset();
+    CU_ASSERT_EQUAL(automation_init(NULL), 0);
+
+    request_t request;
+    memset(&request, 0, sizeof(request));
+    request.function = 6;
+    strncpy(
+        request.response_topic, "response", sizeof(request.response_topic) - 1);
+
+    automation_queue_modbus_result(NULL, 1, NULL);
+    for (unsigned int i = 0; i < 1100; i++) {
+        request.cookie = i;
+        automation_queue_modbus_result(&request, 1, NULL);
+    }
+    CU_ASSERT_EQUAL(mqtt_test_publish_count(), 76);
+    CU_ASSERT_EQUAL(automation_dispatch_pending(), 0);
+    CU_ASSERT_EQUAL(mqtt_test_publish_count(), 1100);
+    CU_ASSERT_STRING_EQUAL(mqtt_test_last_payload(), "1023 OK");
+    automation_shutdown();
+}
+
+void
+test_automation_rejects_invalid_edits_and_reinitializes(void) {
+    mqtt_test_silence_logs();
+    char *path = write_script(
+        "function on_before_request(request)\n"
+        "  if request.cookie == 1 then request.count = 1.5 end\n"
+        "  if request.cookie == 2 then request.values[1] = '7' end\n"
+        "  if request.cookie == 3 then request.count = 2 end\n"
+        "  if request.cookie == 5 then gateway.write_registers(1, {1.5}) end\n"
+        "  if request.cookie == 6 then gateway.write_registers(1, {'7'}) end\n"
+        "end\n"
+        "function on_after_read(response) response.values[1] = 88 end\n"
+        "function on_after_read_registers(response) response.values[1] = 'bad' "
+        "end\n"
+        "function on_mqtt_connected(event) error('still enabled') end\n");
+    CU_ASSERT_PTR_NOT_NULL_FATAL(path);
+    CU_ASSERT_EQUAL(automation_init(path), 0);
+
+    config_t config;
+    request_t request;
+    char reason[64] = {0};
+    memset(&config, 0, sizeof(config));
+    memset(&request, 0, sizeof(request));
+    request.function = 3;
+    request.register_addr = 1;
+    request.register_count = 1;
+
+    request.cookie = 1;
+    CU_ASSERT_NOT_EQUAL(
+        automation_intercept_request(&config, &request, reason, sizeof(reason)),
+        0);
+
+    request.cookie = 4;
+    request.function = 3;
+    request.register_count = 1;
+    request.data[0] = 12;
+    CU_ASSERT_NOT_EQUAL(automation_transform_response(&request), 0);
+    CU_ASSERT_EQUAL(request.data[0], 12);
+    request.cookie = 2;
+    request.register_count = 1;
+    CU_ASSERT_NOT_EQUAL(
+        automation_intercept_request(&config, &request, reason, sizeof(reason)),
+        0);
+    request.cookie = 3;
+    request.function = 16;
+    request.register_count = 1;
+    request.data[0] = 9;
+    CU_ASSERT_NOT_EQUAL(
+        automation_intercept_request(&config, &request, reason, sizeof(reason)),
+        0);
+
+    request.cookie = 5;
+    request.function = 3;
+    request.register_count = 1;
+    CU_ASSERT_NOT_EQUAL(
+        automation_intercept_request(&config, &request, reason, sizeof(reason)),
+        0);
+    request.cookie = 6;
+    CU_ASSERT_NOT_EQUAL(
+        automation_intercept_request(&config, &request, reason, sizeof(reason)),
+        0);
+
+    request.cookie = 7;
+    request.function = 1;
+    request.register_count = 1;
+    request.data[0] = 1;
+    CU_ASSERT_NOT_EQUAL(automation_transform_response(&request), 0);
+    CU_ASSERT_EQUAL(request.data[0], 1);
+
+    mqtt_test_reset();
+    request.cookie = 8;
+    request.function = 3;
+    request.register_count = 1;
+    request.data[0] = 12;
+    strncpy(
+        request.response_topic, "response", sizeof(request.response_topic) - 1);
+    automation_queue_modbus_result(&request, 1, NULL);
+    CU_ASSERT_NOT_EQUAL(automation_dispatch_pending(), 0);
+    CU_ASSERT_EQUAL(mqtt_test_publish_count(), 1);
+    CU_ASSERT_STRING_EQUAL(mqtt_test_last_payload(),
+                           "8 ERROR: response automation failed");
+
+    CU_ASSERT_EQUAL(automation_init(NULL), 0);
+    CU_ASSERT_EQUAL(automation_emit_mqtt_connected(), 0);
     automation_shutdown();
     unlink(path);
     free(path);

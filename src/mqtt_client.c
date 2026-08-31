@@ -38,13 +38,28 @@
 #include "log.h"
 #include "mqtt_client.h"
 
+#define MQTT_MAX_REQUEST_PAYLOAD 2048
+
 static int
 parse_register_values(char *raw_registers, request_t *req) {
-    char *saveptr = NULL;
-    char *token = strtok_r(raw_registers, ",", &saveptr);
+    char *token = raw_registers;
 
     for (uint16_t i = 0; i < req->register_count; i++) {
         if (token == NULL || token[0] == '\0') {
+            return -1;
+        }
+
+        char *comma = strchr(token, ',');
+        if (i + 1 < req->register_count) {
+            if (comma == NULL) {
+                return -1;
+            }
+            *comma = '\0';
+        } else if (comma != NULL) {
+            return -1;
+        }
+
+        if (strspn(token, "0123456789") != strlen(token)) {
             return -1;
         }
 
@@ -57,10 +72,10 @@ parse_register_values(char *raw_registers, request_t *req) {
         }
 
         req->data[i] = (uint16_t)value;
-        token = strtok_r(NULL, ",", &saveptr);
+        token = comma != NULL ? comma + 1 : NULL;
     }
 
-    return token == NULL ? 0 : -1;
+    return 0;
 }
 
 static int
@@ -208,6 +223,10 @@ mqtt_message_callback(struct mosquitto *mosq,
     // obj is config_t
     config_t *config = (config_t *)obj;
 
+    if (config == NULL) {
+        return;
+    }
+
     int error = 0;
     pthread_t ptid;
     request_t *req = calloc(1, sizeof(request_t));
@@ -218,9 +237,13 @@ mqtt_message_callback(struct mosquitto *mosq,
         // Allocation failure means we cannot proceed or report meaningfully
         return;
     }
+    req->response_qos = config->qos;
+    req->response_retain = config->retain;
 
-    if (message == NULL || message->payload == NULL ||
-        message->payloadlen <= 0) {
+    if (message == NULL || message->payload == NULL || message->retain ||
+        message->payloadlen <= 0 ||
+        message->payloadlen > MQTT_MAX_REQUEST_PAYLOAD ||
+        memchr(message->payload, '\0', (size_t)message->payloadlen) != NULL) {
         error = MQTT_INVALID_REQUEST;
         goto cleanup;
     }
@@ -408,11 +431,16 @@ mqtt_message_callback(struct mosquitto *mosq,
     if (automation_result != 0 || request_validate_modbus(req, 0) != 0 ||
         filter_match(config->head, &filter_request) != 0) {
         error = MQTT_ERROR_MESSAGE;
-        const char *message = automation_reason[0] != '\0'
-                                  ? automation_reason
-                                  : "request rejected by automation";
-        mqtt_reply_error(
-            mosq, config->response_topic, req->cookie, error, message);
+        const char *reason = automation_reason[0] != '\0'
+                                 ? automation_reason
+                                 : "request rejected by automation";
+        mqtt_reply_error(mosq,
+                         config->response_topic,
+                         req->cookie,
+                         error,
+                         reason,
+                         req->response_qos,
+                         req->response_retain);
         automation_emit_request_rejected(req->cookie, error);
         free(req);
         goto done;
@@ -424,7 +452,9 @@ mqtt_message_callback(struct mosquitto *mosq,
                          config->response_topic,
                          req->cookie,
                          error,
-                         "request capacity reached");
+                         "request capacity reached",
+                         req->response_qos,
+                         req->response_retain);
         automation_emit_request_rejected(req->cookie, error);
         free(req);
         goto done;
@@ -438,7 +468,9 @@ mqtt_message_callback(struct mosquitto *mosq,
                          config->response_topic,
                          req->cookie,
                          error,
-                         "Unable to start request");
+                         "Unable to start request",
+                         req->response_qos,
+                         req->response_retain);
         automation_emit_request_rejected(req->cookie, error);
         free(req);
         goto done;
@@ -454,7 +486,13 @@ cleanup:
         buffer = NULL;
     }
 
-    mqtt_reply_error(mosq, config->response_topic, req->cookie, error, NULL);
+    mqtt_reply_error(mosq,
+                     config->response_topic,
+                     req->cookie,
+                     error,
+                     NULL,
+                     req->response_qos,
+                     req->response_retain);
     automation_emit_request_rejected(req->cookie, error);
 
     // If something failed along the way
@@ -468,6 +506,10 @@ void
 mqtt_connect_callback(struct mosquitto *mosq, void *obj, int result) {
     config_t *config = (config_t *)obj;
 
+    if (config == NULL) {
+        return;
+    }
+
     if (result != MOSQ_ERR_SUCCESS) {
         flog(logfile,
              "MQTT connection rejected: %s\n",
@@ -476,10 +518,12 @@ mqtt_connect_callback(struct mosquitto *mosq, void *obj, int result) {
         return;
     }
 
-    int rc = mosquitto_subscribe(mosq, NULL, config->request_topic, 0);
+    int rc =
+        mosquitto_subscribe(mosq, NULL, config->request_topic, config->qos);
     if (rc != MOSQ_ERR_SUCCESS) {
         flog(logfile, "unable to subscribe: %s\n", mosquitto_strerror(rc));
         automation_emit_mqtt_disconnected(mosquitto_strerror(rc));
+        mosquitto_disconnect(mosq);
         return;
     }
     automation_emit_mqtt_connected();
@@ -522,7 +566,9 @@ mqtt_reply_error(struct mosquitto *mosq,
                  const char *topic,
                  unsigned long long int cookie,
                  int error,
-                 const char *str_msg) {
+                 const char *str_msg,
+                 int qos,
+                 bool retain) {
     char error_msg[256];
     memset(error_msg, 0, sizeof(error_msg));
 
@@ -552,7 +598,7 @@ mqtt_reply_error(struct mosquitto *mosq,
     }
 
     int rc = mosquitto_publish(
-        mosq, NULL, topic, strlen(error_msg), error_msg, 1, false);
+        mosq, NULL, topic, strlen(error_msg), error_msg, qos, retain);
     mqtt_logfile_log(rc);
 }
 
@@ -561,15 +607,32 @@ mqtt_reply_ok(struct mosquitto *mosq,
               const char *topic,
               unsigned long long int cookie,
               uint32_t datalen,
-              uint16_t *data) {
+              const uint16_t *data,
+              int qos,
+              bool retain) {
     char msg[1024];
     memset(msg, 0, sizeof(msg));
 
     if (datalen > 0) {
+        if (data == NULL) {
+            mqtt_reply_error(mosq,
+                             topic,
+                             cookie,
+                             MQTT_ERROR_MESSAGE,
+                             "missing response data",
+                             qos,
+                             retain);
+            return;
+        }
         char *data_str = join_regs_str(datalen, data, " ");
         if (data_str == NULL) {
-            mqtt_reply_error(
-                mosq, topic, cookie, MQTT_ERROR_MESSAGE, "out of memory");
+            mqtt_reply_error(mosq,
+                             topic,
+                             cookie,
+                             MQTT_ERROR_MESSAGE,
+                             "out of memory",
+                             qos,
+                             retain);
             return;
         }
         snprintf(msg, sizeof(msg), "%llu OK %s", cookie, data_str);
@@ -578,6 +641,7 @@ mqtt_reply_ok(struct mosquitto *mosq,
         snprintf(msg, sizeof(msg), "%llu OK", cookie);
     }
 
-    int rc = mosquitto_publish(mosq, NULL, topic, strlen(msg), msg, 1, false);
+    int rc =
+        mosquitto_publish(mosq, NULL, topic, strlen(msg), msg, qos, retain);
     mqtt_logfile_log(rc);
 }

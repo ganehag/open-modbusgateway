@@ -12,7 +12,7 @@ typedef struct {
     uint8_t format;
     unsigned long long int cookie;
     uint8_t ip_type;
-    char ip[64];
+    char ip[254];
     char port[8];
     uint16_t timeout;
     uint8_t slave_id;
@@ -28,6 +28,8 @@ typedef struct {
     char serial_id[64];
 
     char response_topic[1024];
+    uint8_t response_qos;
+    uint8_t response_retain;
 } request_t;
 
 #define IP_TYPE_IPV4 0

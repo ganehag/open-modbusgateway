@@ -31,7 +31,8 @@ src/openmmg -c /etc/openmmg/openmmg.conf
 
 `src/openmmg.conf.example` is a starting point. Without `-c`, the daemon also
 looks for `/etc/openmmg/openmmg.conf`, `/etc/openmmg/settings.conf`, and
-`./openmmg.conf`.
+`./openmmg.conf`, in that order. If the first existing file is invalid, startup
+fails instead of silently combining it with a later fallback.
 
 Useful development checks:
 
@@ -82,7 +83,9 @@ in that entry replaces the one in the message.
 
 Supported functions are 1, 2, 3, 4, 5, 6, 15, and 16. Read requests allow up
 to 125 values; functions 15 and 16 allow up to 123. The parser rejects extra
-fields, malformed numbers, and out-of-range values.
+fields, malformed numbers, out-of-range values, binary payloads, and request
+payloads larger than 2 KiB. Retained requests are rejected so reconnecting the
+gateway cannot replay an old Modbus operation.
 
 ### Replies
 
@@ -128,6 +131,9 @@ config section_name
 
 Section and option names are exact. Unknown options, bad booleans, and malformed
 numeric values make configuration loading fail rather than being ignored.
+Values must use matching single or double quotes; `#` starts a comment only
+outside a quoted value. Request and response topics must not overlap, because
+the gateway must never consume its own replies.
 
 Here is a minimal RTU configuration:
 
@@ -155,10 +161,16 @@ config rule
     option register_address '1-100'
 ```
 
-`config mqtt` supports `host`, `port`, `keepalive`, `max_inflight_requests`,
-`username`, `password`, `client_id`, `qos`, `retain`, `mqtt_protocol`,
-`tls_version`, `clean_session`, certificate paths, `verify_ca_cert`,
-`request_topic`, and `response_topic`.
+`config mqtt` supports `host`, `port`, `keepalive`, `reconnect_delay`,
+`max_inflight_requests`, `username`, `password`, `client_id`, `qos`, `retain`,
+`mqtt_protocol`, `tls_version`, `clean_session`, certificate paths,
+`verify_ca_cert`, `request_topic`, and `response_topic`.
+
+`keepalive`, `clean_session`, and the positive, seconds-based
+`reconnect_delay` control the broker connection. The gateway keeps retrying
+when the broker is unavailable at startup or disconnects later. `qos` applies
+to both the request subscription and response publications, while `retain`
+controls response publications.
 
 `config serial_gateway` requires `id` and `device`; it also accepts `baudrate`,
 `parity` (`none`, `even`, or `odd`), `data_bits`, `stop_bits`, and an optional
@@ -167,7 +179,9 @@ fixed `slave_id`.
 Each `config rule` has `slave_id`, `function`, and `register_address`, plus
 either TCP target fields (`ip` and optional `port`) or a `serial_id`. Register
 and port options accept a number, a range such as `10-20`, or a comma-separated
-list of ranges.
+list of ranges. For TCP rules, `ip` accepts an IPv6/CIDR range (including an
+IPv4-mapped range) or an exact hostname. Register ranges are one-based, so zero
+is not a valid rule endpoint.
 
 ## Lua automation
 
@@ -199,7 +213,8 @@ on_after_<function>
 Before callbacks may change the address, count, or values in the request table,
 or return `false, "reason"` to reject it. The gateway validates and filters the
 changed request again. Endpoint, unit ID, function, and cookie remain under
-gateway control.
+gateway control. Addresses, counts, and values must be integers; multi-value
+writes must provide exactly one value per requested register or coil.
 
 Scripts may use `gateway.read_registers(address, count)`,
 `gateway.write_registers(address, values)`, and

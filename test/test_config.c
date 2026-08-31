@@ -16,13 +16,13 @@ const char file_content[] = "config rule\n"
                             "    option port '502, 5020-5025'\n"
                             "    option slave_id '1'\n"
                             "    option function '3'\n"
-                            "    option register_address '0-100'\n\n"
+                            "    option register_address '1-100'\n\n"
                             "config rule\n"
                             "    option ip '::ffff:192.168.2.1/120'\n"
                             "    option port '502, 5020-5025'\n"
                             "    option slave_id '1'\n"
                             "    option function '3'\n"
-                            "    option register_address '0-100'\n\n"
+                            "    option register_address '1-100'\n\n"
                             "config rule\n"
                             "    option ip '::ffff:172.16.0.1/120'\n"
                             "    option port '5020'\n"
@@ -37,7 +37,7 @@ const char file_content_single[] =
     "\t\t\r\voption port '502, 5020-5025'\n"
     "    option slave_id\t\t\t\t    '1'\n"
     "    option function '4'\n"
-    "    option register_address '0-100,    50-200'\n";
+    "    option register_address '1-100,    50-200'\n";
 
 // config file content with too many port, ranges > 8
 const char file_content_too_many_port_ranges[] =
@@ -47,7 +47,7 @@ const char file_content_too_many_port_ranges[] =
     "5041-5045, 5046-5050, 5051-5055, 5056-5060'\n"
     "    option slave_id '1'\n"
     "    option function '3'\n"
-    "    option register_address '0-100'\n\n";
+    "    option register_address '1-100'\n\n";
 
 const char file_content_serial_gateway[] = "config serial_gateway\n"
                                            "    option id 'ttyusb0'\n"
@@ -62,7 +62,7 @@ const char file_content_serial_rule[] = "config rule\n"
                                         "    option serial_id 'ttyusb0'\n"
                                         "    option slave_id '3'\n"
                                         "    option function '3'\n"
-                                        "    option register_address '0-10'\n";
+                                        "    option register_address '1-10'\n";
 
 const char file_content_automation[] =
     "config automation\n"
@@ -156,7 +156,7 @@ test_config_parse_single_rule(void) {
     // expected port and register address results
     expected_port_reg_t exp_port_reg[] = {{
                                               {1, 502, 502},
-                                              {1, 0, 100},
+                                              {1, 1, 100},
                                           },
                                           {
                                               {1, 502, 502},
@@ -164,7 +164,7 @@ test_config_parse_single_rule(void) {
                                           },
                                           {
                                               {1, 5020, 5025},
-                                              {1, 0, 100},
+                                              {1, 1, 100},
                                           },
                                           {
                                               {1, 5020, 5025},
@@ -228,6 +228,92 @@ test_validate_config_without_rules(void) {
         config.response_topic, "response", sizeof(config.response_topic) - 1);
 
     CU_ASSERT_EQUAL(validate_config(&config), 0);
+
+    strncpy(
+        config.response_topic, "request", sizeof(config.response_topic) - 1);
+    CU_ASSERT_EQUAL(validate_config(&config), -11);
+
+    strncpy(
+        config.request_topic, "commands/#", sizeof(config.request_topic) - 1);
+    strncpy(
+        config.response_topic, "responses", sizeof(config.response_topic) - 1);
+    CU_ASSERT_EQUAL(validate_config(&config), 0);
+
+    strncpy(config.response_topic,
+            "commands/results",
+            sizeof(config.response_topic) - 1);
+    CU_ASSERT_EQUAL(validate_config(&config), -11);
+
+    strncpy(config.request_topic,
+            "commands/#/invalid",
+            sizeof(config.request_topic) - 1);
+    CU_ASSERT_EQUAL(validate_config(&config), -8);
+
+    strncpy(
+        config.request_topic, "commands/+", sizeof(config.request_topic) - 1);
+    strncpy(config.response_topic,
+            "commands/result",
+            sizeof(config.response_topic) - 1);
+    CU_ASSERT_EQUAL(validate_config(&config), -11);
+
+    strncpy(config.response_topic,
+            "commands/result/detail",
+            sizeof(config.response_topic) - 1);
+    CU_ASSERT_EQUAL(validate_config(&config), 0);
+
+    strncpy(config.request_topic, "#", sizeof(config.request_topic) - 1);
+    strncpy(config.response_topic,
+            "$SYS/openmmg",
+            sizeof(config.response_topic) - 1);
+    CU_ASSERT_EQUAL(validate_config(&config), 0);
+
+    strncpy(config.request_topic, "$SYS/#", sizeof(config.request_topic) - 1);
+    CU_ASSERT_EQUAL(validate_config(&config), -11);
+
+    strncpy(config.request_topic,
+            "$share/workers/commands/#",
+            sizeof(config.request_topic) - 1);
+    strncpy(config.response_topic,
+            "commands/result",
+            sizeof(config.response_topic) - 1);
+    CU_ASSERT_EQUAL(validate_config(&config), -11);
+
+    strncpy(config.request_topic,
+            "$share/+/commands",
+            sizeof(config.request_topic) - 1);
+    CU_ASSERT_EQUAL(validate_config(&config), -8);
+
+    strncpy(config.request_topic, "commands", sizeof(config.request_topic) - 1);
+    strncpy(config.response_topic,
+            "responses/+",
+            sizeof(config.response_topic) - 1);
+    CU_ASSERT_EQUAL(validate_config(&config), -9);
+
+    const char invalid_utf8[] = {'b', 'a', 'd', '/', (char)0xc0, (char)0xaf, 0};
+    memcpy(config.request_topic, invalid_utf8, sizeof(invalid_utf8));
+    strncpy(
+        config.response_topic, "response", sizeof(config.response_topic) - 1);
+    CU_ASSERT_EQUAL(validate_config(&config), -8);
+
+    const char valid_utf8[] = {'s',
+                               'e',
+                               'n',
+                               's',
+                               'o',
+                               'r',
+                               's',
+                               '/',
+                               (char)0xe2,
+                               (char)0x82,
+                               (char)0xac,
+                               0};
+    memcpy(config.request_topic, valid_utf8, sizeof(valid_utf8));
+    CU_ASSERT_EQUAL(validate_config(&config), 0);
+
+    const char control_utf8[] = {
+        'r', 'e', 's', 'p', '/', (char)0xc2, (char)0x80, 0};
+    memcpy(config.response_topic, control_utf8, sizeof(control_utf8));
+    CU_ASSERT_EQUAL(validate_config(&config), -9);
 }
 
 void
@@ -253,6 +339,11 @@ test_validate_config_tls_options(void) {
     CU_ASSERT_EQUAL(validate_config(&config), -7);
 
     strncpy(config.key_path, "client.key", sizeof(config.key_path) - 1);
+    CU_ASSERT_EQUAL(validate_config(&config), 0);
+
+    strncpy(config.password, "secret", sizeof(config.password) - 1);
+    CU_ASSERT_EQUAL(validate_config(&config), -10);
+    strncpy(config.username, "gateway", sizeof(config.username) - 1);
     CU_ASSERT_EQUAL(validate_config(&config), 0);
 }
 
@@ -280,13 +371,15 @@ test_config_parses_request_limit(void) {
 
     fprintf(file,
             "config mqtt\n"
-            "\toption max_inflight_requests '7'\n");
+            "\toption max_inflight_requests '7'\n"
+            "\toption reconnect_delay '3'\n");
     rewind(file);
 
     config_t config;
     memset(&config, 0, sizeof(config));
     CU_ASSERT_EQUAL(config_parse_file(file, &config), 0);
     CU_ASSERT_EQUAL(config.max_inflight_requests, 7);
+    CU_ASSERT_EQUAL(config.reconnect_delay, 3);
     fclose(file);
 }
 
@@ -314,6 +407,296 @@ test_config_rejects_unknown_or_malformed_options(void) {
     memset(&config, 0, sizeof(config));
     CU_ASSERT_EQUAL(config_parse_file(file, &config),
                     CONFIG_PARSER_ERROR_INVALID_PORT);
+    fclose(file);
+
+    file = tmpfile();
+    CU_ASSERT_PTR_NOT_NULL_FATAL(file);
+    fprintf(file,
+            "config mqtt\n"
+            "\toption reconnect_delay '0'\n");
+    rewind(file);
+    memset(&config, 0, sizeof(config));
+    CU_ASSERT_EQUAL(config_parse_file(file, &config), CONFIG_PARSER_ERROR);
+    fclose(file);
+
+    file = tmpfile();
+    CU_ASSERT_PTR_NOT_NULL_FATAL(file);
+    fprintf(file, "option host 'localhost'\n");
+    rewind(file);
+    memset(&config, 0, sizeof(config));
+    CU_ASSERT_EQUAL(config_parse_file(file, &config), CONFIG_PARSER_ERROR);
+    fclose(file);
+}
+
+void
+test_config_rejects_oversized_values_and_ranges(void) {
+    FILE *file = tmpfile();
+    CU_ASSERT_PTR_NOT_NULL_FATAL(file);
+
+    fprintf(file,
+            "config mqtt\n"
+            "\toption host '%0254d'\n",
+            0);
+    rewind(file);
+
+    config_t config;
+    memset(&config, 0, sizeof(config));
+    CU_ASSERT_EQUAL(config_parse_file(file, &config), CONFIG_PARSER_ERROR);
+    fclose(file);
+
+    file = tmpfile();
+    CU_ASSERT_PTR_NOT_NULL_FATAL(file);
+    fprintf(file,
+            "config rule\n"
+            "\toption ip '::ffff:127.0.0.1/128'\n"
+            "\toption port '65536'\n"
+            "\toption slave_id '1'\n"
+            "\toption function '3'\n"
+            "\toption register_address '1'\n");
+    rewind(file);
+    memset(&config, 0, sizeof(config));
+    CU_ASSERT_EQUAL(config_parse_file(file, &config),
+                    CONFIG_PARSER_ERROR_INVALID_PORT);
+    config_free_lists(&config);
+    fclose(file);
+
+    file = tmpfile();
+    CU_ASSERT_PTR_NOT_NULL_FATAL(file);
+    fprintf(file,
+            "config rule\n"
+            "\toption serial_id 'ttyusb0'\n"
+            "\toption slave_id '1'\n"
+            "\toption function '3'\n"
+            "\toption register_address '65536'\n");
+    rewind(file);
+    memset(&config, 0, sizeof(config));
+    CU_ASSERT_EQUAL(config_parse_file(file, &config), 0);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(config.head);
+    CU_ASSERT_EQUAL(config.head->register_address_min, 65536U);
+    CU_ASSERT_EQUAL(config.head->register_address_max, 65536U);
+    config_free_lists(&config);
+    fclose(file);
+}
+
+void
+test_config_rejects_invalid_or_incomplete_rules(void) {
+    FILE *file = tmpfile();
+    CU_ASSERT_PTR_NOT_NULL_FATAL(file);
+    fprintf(file,
+            "config rule\n"
+            "\toption ip 'not_a_cidr'\n"
+            "\toption slave_id '1'\n"
+            "\toption function '3'\n"
+            "\toption register_address '1'\n");
+    rewind(file);
+
+    config_t config;
+    memset(&config, 0, sizeof(config));
+    CU_ASSERT_EQUAL(config_parse_file(file, &config),
+                    CONFIG_PARSER_ERROR_INVALID_IP);
+    CU_ASSERT_PTR_NULL(config.head);
+    fclose(file);
+
+    file = tmpfile();
+    CU_ASSERT_PTR_NOT_NULL_FATAL(file);
+    fprintf(file,
+            "config rule\n"
+            "\toption serial_id 'ttyusb0'\n"
+            "\toption slave_id '1'\n"
+            "\toption function '3'\n"
+            "\toption register_address '0-10'\n");
+    rewind(file);
+    memset(&config, 0, sizeof(config));
+    CU_ASSERT_EQUAL(config_parse_file(file, &config),
+                    CONFIG_PARSER_ERROR_INVALID_REGISTER_ADDRESS);
+    CU_ASSERT_PTR_NULL(config.head);
+    fclose(file);
+
+    file = tmpfile();
+    CU_ASSERT_PTR_NOT_NULL_FATAL(file);
+    fprintf(file,
+            "config serial_gateway\n"
+            "\toption id 'ttyusb0'\n"
+            "\toption device '/dev/ttyUSB0'\n"
+            "\toption ip '127.0.0.1'\n");
+    rewind(file);
+    memset(&config, 0, sizeof(config));
+    CU_ASSERT_EQUAL(config_parse_file(file, &config), CONFIG_PARSER_ERROR);
+    fclose(file);
+
+    file = tmpfile();
+    CU_ASSERT_PTR_NOT_NULL_FATAL(file);
+    fprintf(file,
+            "config rule\n"
+            "\toption serial_id 'ttyusb0'\n"
+            "\toption function '3'\n"
+            "\toption register_address '1'\n");
+    rewind(file);
+    memset(&config, 0, sizeof(config));
+    CU_ASSERT_EQUAL(config_parse_file(file, &config),
+                    CONFIG_PARSER_ERROR_INVALID_SLAVE_ID);
+    CU_ASSERT_PTR_NULL(config.head);
+    fclose(file);
+
+    file = tmpfile();
+    CU_ASSERT_PTR_NOT_NULL_FATAL(file);
+    fprintf(file,
+            "config rule\n"
+            "\toption serial_id 'ttyusb0'\n"
+            "\toption slave_id '1'\n"
+            "\toption function '99'\n"
+            "\toption register_address '1'\n");
+    rewind(file);
+    memset(&config, 0, sizeof(config));
+    CU_ASSERT_EQUAL(config_parse_file(file, &config),
+                    CONFIG_PARSER_ERROR_INVALID_FUNCTION_CODE);
+    CU_ASSERT_PTR_NULL(config.head);
+    fclose(file);
+
+    file = tmpfile();
+    CU_ASSERT_PTR_NOT_NULL_FATAL(file);
+    fprintf(file,
+            "config rule\n"
+            "\toption ip '::1/128'\n"
+            "\toption serial_id 'ttyusb0'\n"
+            "\toption slave_id '1'\n"
+            "\toption function '3'\n"
+            "\toption register_address '1'\n");
+    rewind(file);
+    memset(&config, 0, sizeof(config));
+    CU_ASSERT_EQUAL(config_parse_file(file, &config), CONFIG_PARSER_ERROR);
+    CU_ASSERT_PTR_NULL(config.head);
+    fclose(file);
+
+    file = tmpfile();
+    CU_ASSERT_PTR_NOT_NULL_FATAL(file);
+    fprintf(file,
+            "config rule\n"
+            "\toption ip '::1/128'\n"
+            "\toption port '0-502'\n"
+            "\toption slave_id '1'\n"
+            "\toption function '3'\n"
+            "\toption register_address '1'\n");
+    rewind(file);
+    memset(&config, 0, sizeof(config));
+    CU_ASSERT_EQUAL(config_parse_file(file, &config),
+                    CONFIG_PARSER_ERROR_INVALID_PORT);
+    CU_ASSERT_PTR_NULL(config.head);
+    fclose(file);
+}
+
+void
+test_config_allows_adjacent_sections(void) {
+    FILE *file = tmpfile();
+    CU_ASSERT_PTR_NOT_NULL_FATAL(file);
+    fprintf(file,
+            "config mqtt\n"
+            "\toption host 'localhost'\n"
+            "\n"
+            "\t# Comments and blank lines may appear inside a section.\n"
+            "\toption port '1883'\n"
+            "config serial_gateway\n"
+            "\toption id 'ttyusb0'\n"
+            "\t# Keep the device option visually separate.\n"
+            "\toption device '/dev/ttyUSB0'\n"
+            "config rule\n"
+            "\toption serial_id 'ttyusb0'\n"
+            "\toption slave_id '1'\n"
+            "\toption function '3'\n"
+            "\toption register_address '1-10'\n");
+    rewind(file);
+
+    config_t config;
+    memset(&config, 0, sizeof(config));
+    CU_ASSERT_EQUAL(config_parse_file(file, &config), 0);
+    CU_ASSERT_STRING_EQUAL(config.host, "localhost");
+    CU_ASSERT_PTR_NOT_NULL(config.serial_head);
+    CU_ASSERT_PTR_NOT_NULL(config.head);
+    config_free_lists(&config);
+    fclose(file);
+}
+
+void
+test_config_preserves_hashes_and_rejects_bad_quotes(void) {
+    FILE *file = tmpfile();
+    CU_ASSERT_PTR_NOT_NULL_FATAL(file);
+    fprintf(file,
+            "config mqtt\n"
+            "\toption password 'abc#123' # comment\n");
+    rewind(file);
+
+    config_t config;
+    memset(&config, 0, sizeof(config));
+    CU_ASSERT_EQUAL(config_parse_file(file, &config), 0);
+    CU_ASSERT_STRING_EQUAL(config.password, "abc#123");
+    fclose(file);
+
+    file = tmpfile();
+    CU_ASSERT_PTR_NOT_NULL_FATAL(file);
+    fprintf(file,
+            "config mqtt\n"
+            "\toption host 'unterminated\n");
+    rewind(file);
+    memset(&config, 0, sizeof(config));
+    CU_ASSERT_EQUAL(config_parse_file(file, &config), CONFIG_PARSER_ERROR);
+    fclose(file);
+}
+
+void
+test_hostname_validation_and_storage(void) {
+    const char *long_hostname =
+        "gateway-with-a-long-but-valid-label.example.internal.example.com";
+    CU_ASSERT_TRUE(is_valid_hostname(long_hostname));
+    CU_ASSERT_FALSE(is_valid_hostname("-gateway.example.com"));
+    CU_ASSERT_FALSE(is_valid_hostname("gateway-.example.com"));
+    CU_ASSERT_FALSE(is_valid_ipv4(NULL));
+    CU_ASSERT_FALSE(is_valid_ipv6(NULL));
+    CU_ASSERT_FALSE(is_valid_hostname("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                                      "aaaaaaaaaaaaaaaaaaaaaaaa.com"));
+
+    FILE *file = tmpfile();
+    CU_ASSERT_PTR_NOT_NULL_FATAL(file);
+    fprintf(file,
+            "config mqtt\n"
+            "\toption host '%s'\n",
+            long_hostname);
+    rewind(file);
+    config_t config;
+    memset(&config, 0, sizeof(config));
+    CU_ASSERT_EQUAL(config_parse_file(file, &config), 0);
+    CU_ASSERT_STRING_EQUAL(config.host, long_hostname);
+    fclose(file);
+
+    file = tmpfile();
+    CU_ASSERT_PTR_NOT_NULL_FATAL(file);
+    fprintf(file,
+            "config rule\n"
+            "\toption ip '%s'\n"
+            "\toption slave_id '1'\n"
+            "\toption function '3'\n"
+            "\toption register_address '1-10'\n",
+            long_hostname);
+    rewind(file);
+    memset(&config, 0, sizeof(config));
+    CU_ASSERT_EQUAL(config_parse_file(file, &config), 0);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(config.head);
+    CU_ASSERT_TRUE(config.head->has_hostname);
+    CU_ASSERT_STRING_EQUAL(config.head->hostname, long_hostname);
+
+    request_t request;
+    memset(&request, 0, sizeof(request));
+    request.format = 0;
+    request.ip_type = IP_TYPE_HOSTNAME;
+    strncpy(request.ip, long_hostname, sizeof(request.ip) - 1);
+    strncpy(request.port, "502", sizeof(request.port) - 1);
+    request.slave_id = 1;
+    request.function = 3;
+    request.register_addr = 1;
+    request.register_count = 1;
+    CU_ASSERT_EQUAL(filter_match(config.head, &request), 0);
+    strncpy(request.ip, "other.example.com", sizeof(request.ip) - 1);
+    CU_ASSERT_EQUAL(filter_match(config.head, &request), -1);
+    config_free_lists(&config);
     fclose(file);
 }
 
@@ -433,7 +816,7 @@ test_config_parse_serial_rule(void) {
     CU_ASSERT_STRING_EQUAL(rule->serial_id, "ttyusb0");
     CU_ASSERT_EQUAL(rule->applies_tcp, 0);
     CU_ASSERT_EQUAL(rule->has_port_range, 0);
-    CU_ASSERT_EQUAL(rule->register_address_min, 0);
+    CU_ASSERT_EQUAL(rule->register_address_min, 1);
     CU_ASSERT_EQUAL(rule->register_address_max, 10);
 
     config_free_lists(&config);
@@ -487,6 +870,8 @@ void
 test_parse_option_range_errors(void) {
     // parse_option_range(char *option_value, range_u32_t *list)
     range_u32_t list[MAX_RANGES];
+    config_t config;
+    memset(&config, 0, sizeof(config));
 
     char *options_too_many_ranges =
         "1, 2, 3, 4, 5, 6, 7, 8, 9"; // 502, 5020-5025, 5026-5030, 5031-5035,
@@ -511,6 +896,24 @@ test_parse_option_range_errors(void) {
     char options_invalid_number[] = "12abc";
     CU_ASSERT_EQUAL(parse_option_range(options_invalid_number, list),
                     PARSE_RANGE_ERROR_INVALID_NUMBER);
+    char options_leading_comma[] = ",1";
+    CU_ASSERT_EQUAL(parse_option_range(options_leading_comma, list),
+                    PARSE_RANGE_ERROR_INVALID_RANGE);
+    char options_trailing_comma[] = "1,";
+    CU_ASSERT_EQUAL(parse_option_range(options_trailing_comma, list),
+                    PARSE_RANGE_ERROR_INVALID_RANGE);
+    char options_empty_range[] = "1, ,2";
+    CU_ASSERT_EQUAL(parse_option_range(options_empty_range, list),
+                    PARSE_RANGE_ERROR_INVALID_RANGE);
+    CU_ASSERT_EQUAL(parse_option_range(NULL, list),
+                    PARSE_RANGE_ERROR_INVALID_RANGE);
+    CU_ASSERT_EQUAL(parse_option_range(options_invalid_number, NULL),
+                    PARSE_RANGE_ERROR_INVALID_RANGE);
+    CU_ASSERT_EQUAL(config_parse_file(NULL, NULL), CONFIG_PARSER_ERROR);
+    CU_ASSERT_EQUAL(config_parse(NULL, NULL), CONFIG_PARSER_ERROR);
+    CU_ASSERT_EQUAL(config_parse("/nonexistent/openmmg/config", &config),
+                    CONFIG_PARSER_ERROR_FILE_NOT_FOUND);
+    CU_ASSERT_EQUAL(config_parse("/", &config), CONFIG_PARSER_ERROR);
 }
 
 void

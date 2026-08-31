@@ -13,6 +13,8 @@ test_ip_in_range(void) {
     }
 
     CU_ASSERT_TRUE(ip_in_range(ip, &iprange) == 0);
+    CU_ASSERT_EQUAL(ip_in_range(NULL, &iprange), -1);
+    CU_ASSERT_EQUAL(ip_in_range(ip, NULL), -1);
 }
 
 void

@@ -42,6 +42,10 @@ define Package/open-modbusgateway/description
 	An Open Source alternative to Teltonikas' Modbus Gateway.
 endef
 
+define Package/open-modbusgateway/conffiles
+/etc/config/openmmg
+endef
+
 define Package/open-modbusgateway/install
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_DIR) $(1)/etc/init.d
